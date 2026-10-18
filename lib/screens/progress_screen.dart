@@ -6,6 +6,7 @@ import '../services/profile_repository.dart';
 import '../services/weight_repository.dart';
 import '../utils/dates.dart';
 import '../utils/units.dart';
+import '../widgets/goat_celebration.dart';
 import '../widgets/weight_chart.dart';
 
 enum _Range { month, threeMonths, sixMonths, year, all }
@@ -117,6 +118,20 @@ class _ProgressScreenState extends State<ProgressScreen> {
       return;
     }
     await _weights.log(d, kg);
+    if (mounted && _reachedGoal(kg)) await showGoatCelebration(context);
+  }
+
+  /// True when a weigh-in is at or past her goal weight, in the direction
+  /// she's heading (down if losing, up if gaining).
+  bool _reachedGoal(double kg) {
+    final goal = _profile.profile.goalWeightKg;
+    if (goal == null) return false;
+    final all = _weights.entries;
+    final startKg = all.length > 1 ? all.first.kg : null;
+    final losing = startKg != null
+        ? goal <= startKg
+        : _profile.profile.goal != Goal.gain;
+    return losing ? kg <= goal + 0.01 : kg >= goal - 0.01;
   }
 
   Future<void> _setGoalWeight() async {
