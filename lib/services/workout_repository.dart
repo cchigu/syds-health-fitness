@@ -17,6 +17,14 @@ class WorkoutPrefsRepository extends SyncedStore<WorkoutPrefs> {
   Future<void> save(WorkoutPrefs p) =>
       put(p.copyWith(updatedAt: DateTime.now()));
 
+  /// Turn the intensity dial (-2 to +2).
+  Future<void> setIntensity(int level) async {
+    final p = prefs;
+    if (p == null) return;
+    await save(p.copyWith(
+        intensity: level.clamp(Intensity.min, Intensity.max)));
+  }
+
   /// Remember an exercise swap so the plan keeps it.
   Future<void> swap(String slotKey, String exerciseId) async {
     final p = prefs;

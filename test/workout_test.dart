@@ -105,4 +105,48 @@ void main() {
     expect(back.weekdays, {1, 3, 5});
     expect(back.avoid, {BodyArea.wrists});
   });
+
+  group('intensity', () {
+    PlannedExercise squat(int level) {
+      final w = WorkoutPlanner.build(
+        SessionType.lowerA,
+        _prefs(minutes: 45).copyWith(intensity: level),
+        Units.imperial,
+      );
+      return _all(w).firstWhere((e) => e.exercise.id == 'goblet_squat');
+    }
+
+    int setsOf(PlannedExercise e) =>
+        int.parse(e.prescription.split(' ').first);
+    int topWeight(PlannedExercise e) =>
+        int.parse(e.weight!.split('–').last.split(' ').first);
+
+    test('turning it up adds sets and weight; down does the opposite', () {
+      expect(setsOf(squat(2)), greaterThan(setsOf(squat(0))));
+      expect(setsOf(squat(-2)), lessThan(setsOf(squat(0))));
+      expect(topWeight(squat(1)), greaterThanOrEqualTo(topWeight(squat(0))));
+      expect(topWeight(squat(-2)), lessThan(topWeight(squat(0))));
+    });
+
+    test('never over 25 lb even in beast mode', () {
+      for (final exp in Experience.values) {
+        final plan = WorkoutPlanner.weekPlan(
+          _prefs(days: {1, 2, 3, 4, 5}, exp: exp, minutes: 45)
+              .copyWith(intensity: 2),
+          Units.imperial,
+        );
+        for (final w in plan.values) {
+          for (final pe in _all(w)) {
+            if (pe.weight == null) continue;
+            expect(topWeight(pe), lessThanOrEqualTo(25));
+          }
+        }
+      }
+    });
+
+    test('intensity is saved with the plan', () {
+      final p = _prefs().copyWith(intensity: -1);
+      expect(WorkoutPrefs.fromMap(p.toMap())!.intensity, -1);
+    });
+  });
 }

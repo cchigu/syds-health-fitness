@@ -207,6 +207,13 @@ class WorkoutPlanner {
                     : (m <= 30 ? (5, 0) : (7, 5)),
               };
 
+    // Intensity adds or removes ~2 treadmill minutes per level; at the top
+    // level even strength days get a short finisher.
+    final i = p.intensity;
+    final cardio = cardioMin == 0
+        ? (i >= 2 ? 5 : 0)
+        : max(isMobility ? 10 : 4, cardioMin + 2 * i);
+
     final sections = <WorkoutSection>[
       WorkoutSection('Warm-up', [
         PlannedExercise(
@@ -226,15 +233,19 @@ class WorkoutPlanner {
         isCardioDay ? 'Core' : 'Strength',
         main,
         note: isCardioDay
-            ? 'Rest about 30 s between exercises.'
+            ? 'Rest about ${max(15, 30 - 5 * i)} s between exercises.'
             : _restNote(p),
       ));
     }
 
-    if (cardioMin > 0) {
+    if (cardio > 0) {
       sections.add(WorkoutSection(
         'Treadmill',
-        [_cardio(p, cardioMin, steady: isMobility)],
+        [_cardio(p, cardio, steady: isMobility)],
+        note: i > 0
+            ? 'Push the speed or incline up a notch from your usual.'
+            : (i < 0 ? 'Keep it comfortable — you can talk the whole time.'
+                : null),
       ));
     }
 
@@ -246,7 +257,9 @@ class WorkoutPlanner {
 
     return PlannedWorkout(
       title: titleOf(type),
-      subtitle: '$m min · ${p.focus.label}',
+      subtitle: i == 0
+          ? '$m min · ${p.focus.label}'
+          : '$m min · ${p.focus.label} · ${Intensity.label(i)}',
       minutes: m,
       sections: sections,
     );
@@ -281,25 +294,22 @@ class WorkoutPlanner {
   static PlannedExercise _prescribe(Exercise e, WorkoutPrefs p, Units units,
       {String? slotKey, List<Exercise> alternatives = const []}) {
     final each = e.perSide ? ' each side' : '';
+    final i = p.intensity;
     final setAdj = switch (p.experience) {
-      Experience.beginner => -1,
-      Experience.intermediate => 0,
-      Experience.advanced => 1,
-    };
+          Experience.beginner => -1,
+          Experience.intermediate => 0,
+          Experience.advanced => 1,
+        } +
+        (i > 0 ? 1 : (i < 0 ? -1 : 0)) +
+        (i.abs() >= 2 ? i.sign : 0);
 
     if (e.kind == ExerciseKind.core) {
-      final sets = max(2, 3 + (setAdj > 0 ? 0 : setAdj));
+      final sets = (3 + min(setAdj, 1)).clamp(2, 4);
+      // Experience picks the starting point; intensity moves it up or down.
+      final level = (p.experience.index + 1 + i).clamp(0, 4);
       final dose = e.timeBased
-          ? switch (p.experience) {
-              Experience.beginner => '20–30 s',
-              Experience.intermediate => '30–45 s',
-              Experience.advanced => '45–60 s',
-            }
-          : switch (p.experience) {
-              Experience.beginner => '8–10',
-              Experience.intermediate => '10–12',
-              Experience.advanced => '12–15',
-            };
+          ? const ['15–20 s', '20–30 s', '30–45 s', '45–60 s', '60–75 s'][level]
+          : const ['6–8', '8–10', '10–12', '12–15', '15–20'][level];
       return PlannedExercise(
         exercise: e,
         prescription: '$sets × $dose$each',
@@ -313,7 +323,7 @@ class WorkoutPlanner {
       WorkoutFocus.both => (3, '10–12'),
       WorkoutFocus.fatLoss => (3, '12–15'),
     };
-    final sets = (baseSets + setAdj).clamp(2, 4);
+    final sets = (baseSets + setAdj).clamp(2, 5);
 
     String? weight;
     final range = e.weightLb;
@@ -330,7 +340,11 @@ class WorkoutPlanner {
         a = max(lo, a - 3);
         b = max(a + 2, b - 3);
       }
-      a = max(lo, min(a, 25));
+      // Intensity: about 2–3 lb heavier or lighter per level.
+      a += (i * 2.5).round();
+      b += (i * 2.5).round();
+      final floor = i < 0 ? max(3, lo - 5) : lo;
+      a = max(floor, min(a, 25));
       b = max(a, min(b, 25));
       weight = units == Units.imperial
           ? '$a–$b lb'
@@ -348,11 +362,16 @@ class WorkoutPlanner {
     );
   }
 
-  static String _rest(WorkoutPrefs p) => switch (p.focus) {
-        WorkoutFocus.strength => 'Rest 60–90 s',
-        WorkoutFocus.both => 'Rest 45–60 s',
-        WorkoutFocus.fatLoss => 'Rest 30–45 s',
-      };
+  /// Shorter rests when turned up, longer when turned down.
+  static String _rest(WorkoutPrefs p) {
+    final (lo, hi) = switch (p.focus) {
+      WorkoutFocus.strength => (60, 90),
+      WorkoutFocus.both => (45, 60),
+      WorkoutFocus.fatLoss => (30, 45),
+    };
+    final shift = 10 * p.intensity;
+    return 'Rest ${max(20, lo - shift)}–${max(30, hi - shift)} s';
+  }
 
   static String _restNote(WorkoutPrefs p) =>
       '${_rest(p)} between sets. Pick a weight where the last 2 reps feel '
@@ -360,14 +379,18 @@ class WorkoutPlanner {
 
   static PlannedExercise _cardio(WorkoutPrefs p, int minutes,
       {bool steady = false}) {
+    // Turning intensity up or down picks the cardio for one level of
+    // experience higher or lower.
+    final level = (p.experience.index + p.intensity.sign).clamp(0, 2);
+    final exp = Experience.values[level];
     final order = steady
         ? ['steady_walk']
         : switch (p.focus) {
-            WorkoutFocus.fatLoss => p.experience == Experience.beginner
+            WorkoutFocus.fatLoss => exp == Experience.beginner
                 ? ['walk_intervals', 'incline_walk', 'steady_walk']
                 : ['run_intervals', 'incline_intervals', 'walk_intervals',
                     'steady_walk'],
-            WorkoutFocus.both => p.experience == Experience.advanced
+            WorkoutFocus.both => exp == Experience.advanced
                 ? ['incline_intervals', 'walk_intervals', 'steady_walk']
                 : ['incline_walk', 'walk_intervals', 'steady_walk'],
             WorkoutFocus.strength => ['incline_walk', 'steady_walk'],

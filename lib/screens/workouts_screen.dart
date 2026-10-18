@@ -194,6 +194,8 @@ class WorkoutsScreen extends StatelessWidget {
           ),
         ),
 
+        _IntensityCard(level: prefs.intensity),
+
         // Week plan
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 16, 8, 4),
@@ -289,6 +291,85 @@ class _DayDot extends StatelessWidget {
                   : null),
         ),
       ],
+    );
+  }
+}
+
+/// Turn the whole plan up or down: sets, weights, holds, rest, treadmill.
+class _IntensityCard extends StatelessWidget {
+  const _IntensityCard({required this.level});
+  final int level;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final repo = WorkoutPrefsRepository.instance;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Intensity', style: text.labelLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                IconButton.filledTonal(
+                  tooltip: 'Turn it down',
+                  onPressed: level <= Intensity.min
+                      ? null
+                      : () => repo.setIntensity(level - 1),
+                  icon: const Icon(Icons.remove),
+                ),
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        Intensity.label(level),
+                        style: text.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          for (var l = Intensity.min; l <= Intensity.max; l++)
+                            Container(
+                              width: 22,
+                              height: 8,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 3),
+                              decoration: BoxDecoration(
+                                color: l <= level
+                                    ? colors.primary
+                                    : colors.surfaceContainerHighest,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.filledTonal(
+                  tooltip: 'Turn it up',
+                  onPressed: level >= Intensity.max
+                      ? null
+                      : () => repo.setIntensity(level + 1),
+                  icon: const Icon(Icons.add),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              Intensity.description(level),
+              style: text.bodySmall?.copyWith(color: colors.outline),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

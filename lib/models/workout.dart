@@ -36,6 +36,29 @@ extension WorkoutFocusLabel on WorkoutFocus {
 
 enum Experience { beginner, intermediate, advanced }
 
+/// The intensity dial on the Workouts tab: -2 (easiest) to +2 (hardest).
+class Intensity {
+  Intensity._();
+  static const int min = -2;
+  static const int max = 2;
+
+  static String label(int level) => switch (level) {
+        <= -2 => 'Easy does it',
+        -1 => 'A bit lighter',
+        0 => 'Normal',
+        1 => 'Turned up',
+        _ => 'Beast mode 🔥',
+      };
+
+  static String description(int level) => switch (level) {
+        <= -2 => 'Fewer sets, lighter weights, longer rests, gentle cardio.',
+        -1 => 'A little easier than your plan — good for tired or busy weeks.',
+        0 => 'Your plan exactly as built for you.',
+        1 => 'An extra push: more sets, heavier weights, shorter rests.',
+        _ => 'Maximum effort: the most sets, heaviest weights and cardio.',
+      };
+}
+
 extension ExperienceLabel on Experience {
   String get label => switch (this) {
         Experience.beginner => 'New to it',
@@ -98,8 +121,12 @@ class WorkoutPrefs implements Syncable {
     required this.avoid,
     required this.updatedAt,
     this.swaps = const {},
+    this.intensity = 0,
     this.deleted = false,
   });
+
+  /// -2 (easiest) to +2 (hardest); 0 = the plan as built.
+  final int intensity;
 
   /// 1 = Monday ... 7 = Sunday.
   final Set<int> weekdays;
@@ -118,7 +145,11 @@ class WorkoutPrefs implements Syncable {
   @override
   String get id => 'current';
 
-  WorkoutPrefs copyWith({Map<String, String>? swaps, DateTime? updatedAt}) =>
+  WorkoutPrefs copyWith({
+    Map<String, String>? swaps,
+    int? intensity,
+    DateTime? updatedAt,
+  }) =>
       WorkoutPrefs(
         weekdays: weekdays,
         minutes: minutes,
@@ -126,6 +157,7 @@ class WorkoutPrefs implements Syncable {
         experience: experience,
         avoid: avoid,
         swaps: swaps ?? this.swaps,
+        intensity: intensity ?? this.intensity,
         updatedAt: updatedAt ?? this.updatedAt,
       );
 
@@ -137,6 +169,7 @@ class WorkoutPrefs implements Syncable {
         'experience': experience.name,
         'avoid': [for (final a in avoid) a.name],
         'swaps': swaps,
+        'intensity': intensity,
         'updatedAt': updatedAt.millisecondsSinceEpoch,
         'deleted': deleted,
       };
@@ -164,6 +197,8 @@ class WorkoutPrefs implements Syncable {
         for (final e in ((m['swaps'] as Map?) ?? const {}).entries)
           '${e.key}': '${e.value}',
       },
+      intensity: ((m['intensity'] as num?)?.toInt() ?? 0)
+          .clamp(Intensity.min, Intensity.max),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
           (m['updatedAt'] as num?)?.toInt() ?? 0),
       deleted: m['deleted'] == true,

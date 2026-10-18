@@ -71,6 +71,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
               old.avoid.containsAll(_avoid)
           ? old.swaps
           : const {},
+      intensity: old?.intensity ?? 0,
       updatedAt: DateTime.now(),
     ));
     if (mounted) Navigator.of(context).pop(true);
