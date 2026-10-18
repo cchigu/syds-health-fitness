@@ -7,6 +7,7 @@ import '../services/profile_repository.dart';
 import '../services/workout_repository.dart';
 import '../utils/dates.dart';
 import '../utils/units.dart';
+import '../widgets/exercise_photo.dart';
 import '../widgets/time_breakdown.dart';
 
 /// One workout: warm-up, exercises, treadmill and stretches.
@@ -527,7 +528,13 @@ class _ExerciseTile extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 4),
       child: ListTile(
         onTap: onOpen,
-        leading: Checkbox(value: done, onChanged: (_) => onToggle()),
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Checkbox(value: done, onChanged: (_) => onToggle()),
+            ExerciseThumb(exerciseId: e.id),
+          ],
+        ),
         title: Text(
           e.name,
           style: done
@@ -584,6 +591,8 @@ class _ExerciseSheet extends StatelessWidget {
               Text('Your numbers', style: text.labelSmall),
             const SizedBox(height: 4),
             Text(e.equipment, style: text.bodySmall),
+            const SizedBox(height: 12),
+            ExercisePhotoPair(exerciseId: e.id),
             const SizedBox(height: 16),
             for (var i = 0; i < e.steps.length; i++)
               Padding(
@@ -763,6 +772,7 @@ class _AddExerciseSheetState extends State<_AddExerciseSheet> {
     final colors = Theme.of(context).colorScheme;
     final loads = e.stresses.intersection(p.avoid);
     return ListTile(
+      leading: ExerciseThumb(exerciseId: e.id, size: 40),
       title: Text(e.name),
       subtitle: Text(
         loads.isEmpty
