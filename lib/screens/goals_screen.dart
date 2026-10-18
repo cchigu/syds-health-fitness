@@ -502,26 +502,25 @@ class _RateTile extends StatelessWidget {
           selected ? Icons.check_circle : Icons.circle_outlined,
           color: selected ? colors.primary : colors.outline,
         ),
-        title: Row(
-          children: [
-            Text(formatRate(option.kgPerWeek, units)),
-            if (option.recommended) ...[
-              const SizedBox(width: 8),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: colors.primary,
-                  borderRadius: BorderRadius.circular(20),
+        title: Text(formatRate(option.kgPerWeek, units)),
+        subtitle: option.recommended
+            ? Align(
+                alignment: Alignment.centerLeft,
+                child: Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: colors.primary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Recommended',
+                    style: text.labelSmall?.copyWith(color: colors.onPrimary),
+                  ),
                 ),
-                child: Text(
-                  'Recommended',
-                  style: text.labelSmall?.copyWith(color: colors.onPrimary),
-                ),
-              ),
-            ],
-          ],
-        ),
+              )
+            : null,
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.end,
