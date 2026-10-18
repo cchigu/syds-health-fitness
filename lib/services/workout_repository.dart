@@ -164,21 +164,47 @@ class WorkoutScheduleRepository extends SyncedStore<ScheduleChange> {
   ScheduleChange? changeFor(DateTime originalDay) =>
       byId(dayKey(originalDay));
 
-  Future<void> move(DateTime originalDay, DateTime newDay) =>
-      isSameDay(originalDay, newDay)
-          ? restore(originalDay)
-          : put(ScheduleChange(
-              originalDay: dayOnly(originalDay),
-              newDay: dayOnly(newDay),
-              updatedAt: DateTime.now(),
-            ));
+  Future<void> _update(
+    DateTime originalDay, {
+    DateTime? Function(DateTime?)? newDay,
+    bool? skipped,
+    int? Function(int?)? minutes,
+  }) {
+    final old = changeFor(originalDay);
+    final next = ScheduleChange(
+      originalDay: dayOnly(originalDay),
+      newDay: newDay != null ? newDay(old?.newDay) : old?.newDay,
+      skipped: skipped ?? old?.skipped ?? false,
+      minutes: minutes != null ? minutes(old?.minutes) : old?.minutes,
+      updatedAt: DateTime.now(),
+    );
+    return put(next.isEmpty
+        ? ScheduleChange(
+            originalDay: next.originalDay,
+            updatedAt: next.updatedAt,
+            deleted: true,
+          )
+        : next);
+  }
 
-  Future<void> skip(DateTime originalDay) => put(ScheduleChange(
-        originalDay: dayOnly(originalDay),
-        updatedAt: DateTime.now(),
-      ));
+  /// Move it to another day this week (moving back = its usual day).
+  Future<void> move(DateTime originalDay, DateTime newDay) => _update(
+        originalDay,
+        newDay: (_) => isSameDay(originalDay, newDay) ? null : dayOnly(newDay),
+        skipped: false,
+      );
 
-  /// Put it back on its usual day.
+  Future<void> skip(DateTime originalDay) =>
+      _update(originalDay, skipped: true);
+
+  Future<void> unskip(DateTime originalDay) =>
+      _update(originalDay, skipped: false);
+
+  /// A different length just this week (null = her usual length).
+  Future<void> setMinutes(DateTime originalDay, int? minutes) =>
+      _update(originalDay, minutes: (_) => minutes);
+
+  /// Undo every change to it this week.
   Future<void> restore(DateTime originalDay) => put(ScheduleChange(
         originalDay: dayOnly(originalDay),
         updatedAt: DateTime.now(),

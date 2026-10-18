@@ -514,26 +514,39 @@ class CustomExerciseDef {
       );
 }
 
-/// A one-week change: a workout moved to another day, or skipped.
+/// A one-week change to one workout: moved to another day, skipped, and/or
+/// a different length. Next week is back to normal.
 class ScheduleChange implements Syncable {
   const ScheduleChange({
     required this.originalDay,
     required this.updatedAt,
     this.newDay,
+    this.skipped = false,
+    this.minutes,
     this.deleted = false,
   });
 
   /// The day it was planned for.
   final DateTime originalDay;
 
-  /// Where it moved to; null means skipped this week.
+  /// Where it moved to (null = still on its usual day).
   final DateTime? newDay;
+
+  /// Skipped this week.
+  final bool skipped;
+
+  /// A different length just this week (null = her usual length).
+  final int? minutes;
   @override
   final DateTime updatedAt;
   @override
   final bool deleted;
 
-  bool get skipped => newDay == null;
+  /// True when this no longer changes anything.
+  bool get isEmpty =>
+      !skipped &&
+      minutes == null &&
+      (newDay == null || isSameDay(newDay!, originalDay));
 
   @override
   String get id => dayKey(originalDay);
@@ -542,6 +555,8 @@ class ScheduleChange implements Syncable {
   Map<String, dynamic> toMap() => {
         'originalDay': dayKey(originalDay),
         'newDay': newDay == null ? null : dayKey(newDay!),
+        'skipped': skipped,
+        'minutes': minutes,
         'updatedAt': updatedAt.millisecondsSinceEpoch,
         'deleted': deleted,
       };
@@ -549,9 +564,13 @@ class ScheduleChange implements Syncable {
   static ScheduleChange? fromMap(Map<String, dynamic> m) {
     final original = parseDayKey(m['originalDay'] as String?);
     if (original == null) return null;
+    final newDay = parseDayKey(m['newDay'] as String?);
     return ScheduleChange(
       originalDay: original,
-      newDay: parseDayKey(m['newDay'] as String?),
+      newDay: newDay,
+      // Older saves marked a skip by having no new day.
+      skipped: m['skipped'] as bool? ?? newDay == null,
+      minutes: (m['minutes'] as num?)?.toInt(),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
           (m['updatedAt'] as num?)?.toInt() ?? 0),
       deleted: m['deleted'] == true,
@@ -565,7 +584,15 @@ class ScheduledWorkout {
     required this.day,
     required this.originalDay,
     required this.workout,
+    this.lengthThisWeek,
+    this.usualMinutes,
   });
+
+  /// Set when she changed the length just for this week.
+  final int? lengthThisWeek;
+
+  /// Her regular length for this workout day.
+  final int? usualMinutes;
 
   final DateTime day;
   final DateTime originalDay;

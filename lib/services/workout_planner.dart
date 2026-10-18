@@ -161,15 +161,18 @@ class WorkoutPlanner {
         SessionType.mobility => 'Walk & stretch',
       };
 
-  /// Weekday (1 = Monday) -> that day's workout.
-  static Map<int, PlannedWorkout> weekPlan(WorkoutPrefs p, Units units) {
+  /// Weekday (1 = Monday) -> which workout is that day.
+  static Map<int, SessionType> weekTypes(WorkoutPrefs p) {
     final days = p.weekdays.toList()..sort();
     final split = splitFor(days.length);
-    return {
-      for (var i = 0; i < days.length; i++)
-        days[i]: build(split[i], p, units, minutes: p.minutesFor(days[i])),
-    };
+    return {for (var i = 0; i < days.length; i++) days[i]: split[i]};
   }
+
+  /// Weekday (1 = Monday) -> that day's workout at her usual length.
+  static Map<int, PlannedWorkout> weekPlan(WorkoutPrefs p, Units units) => {
+        for (final e in weekTypes(p).entries)
+          e.key: build(e.value, p, units, minutes: p.minutesFor(e.key)),
+      };
 
   /// The actual dates for the week starting [monday], after one-week moves
   /// and skips.
@@ -181,13 +184,16 @@ class WorkoutPlanner {
   }) {
     final scheduled = <ScheduledWorkout>[];
     final skipped = <ScheduledWorkout>[];
-    weekPlan(p, units).forEach((weekday, workout) {
+    weekTypes(p).forEach((weekday, type) {
       final original = dayOnly(monday.add(Duration(days: weekday - 1)));
       final change = changeFor(original);
+      final usual = p.minutesFor(weekday);
       final s = ScheduledWorkout(
         day: change?.newDay ?? original,
         originalDay: original,
-        workout: workout,
+        workout: build(type, p, units, minutes: change?.minutes ?? usual),
+        lengthThisWeek: change?.minutes,
+        usualMinutes: usual,
       );
       if (change != null && change.skipped) {
         skipped.add(s);
@@ -329,11 +335,15 @@ class WorkoutPlanner {
         type == SessionType.cardioCore2;
     final isMobility = type == SessionType.mobility;
 
-    final warm = m <= 15 ? 3 : 5;
+    final warm = m <= 12 ? 2 : (m <= 15 ? 3 : 5);
     final stretchList = _stretches(type, p,
         count: isMobility
             ? 8
-            : (m <= 20 ? 3 : (m <= 30 ? 4 : (m <= 45 ? 5 : 6))));
+            : (m <= 12
+                ? 2
+                : (m <= 20
+                    ? 3
+                    : (m <= 30 ? 4 : (m <= 45 ? 5 : (m <= 75 ? 6 : 7))))));
     final stretchMin = stretchList.fold<double>(
         0, (t, pe) => t + estimateMinutes(pe.exercise, pe.prescription, p));
     final left = m - warm - stretchMin;
@@ -348,7 +358,7 @@ class WorkoutPlanner {
       strengthCount = m >= 45 ? 4 : 3;
       perExercise = _coreSets(p) * 0.75;
       // Short days: fewer core moves so there's still real treadmill time.
-      while (strengthCount > 2 && left - strengthCount * perExercise < 5) {
+      while (strengthCount > 1 && left - strengthCount * perExercise < 5) {
         strengthCount--;
       }
       strengthBudget = strengthCount * perExercise;
@@ -362,11 +372,13 @@ class WorkoutPlanner {
       cardio = (left * share).round();
       if (cardio > 0) cardio += 2 * i; // intensity: ~2 min per level
       if (cardio == 0 && i >= 2 && m >= 20) cardio = 5;
-      if (cardio < 4) cardio = p.focus == WorkoutFocus.fatLoss ? 4 : 0;
+      if (cardio < 4) {
+        cardio = p.focus == WorkoutFocus.fatLoss && left >= 9 ? 4 : 0;
+      }
 
       perExercise = _strengthSets(p) * _perSet(p);
       strengthBudget = max(0.0, left - cardio);
-      strengthCount = (strengthBudget / perExercise).floor().clamp(2, 7);
+      strengthCount = (strengthBudget / perExercise).floor().clamp(1, 7);
     }
 
     // Build the exercises first: if fewer fit than planned (e.g. some were
@@ -381,7 +393,7 @@ class WorkoutPlanner {
       WorkoutSection('Warm-up', [
         PlannedExercise(
           exercise: ExerciseLibrary.byId('warmup_walk'),
-          prescription: '${warm - 1} min',
+          prescription: '${max(1, warm - 1)} min',
         ),
         PlannedExercise(
           exercise: ExerciseLibrary.byId('arm_circles_leg_swings'),

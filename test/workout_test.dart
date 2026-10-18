@@ -223,7 +223,8 @@ void main() {
       final fri = DateTime(2026, 10, 23);
       final week = WorkoutPlanner.weekSchedule(p, Units.imperial, monday,
           changeFor: (d) => d == fri
-              ? ScheduleChange(originalDay: fri, updatedAt: DateTime(2026))
+              ? ScheduleChange(
+                  originalDay: fri, skipped: true, updatedAt: DateTime(2026))
               : null);
       expect(week.scheduled, hasLength(2));
       expect(week.skipped.single.originalDay, fri);
@@ -233,7 +234,7 @@ void main() {
   group('time', () {
     test('each workout fits the length she picked for that day', () {
       for (final focus in WorkoutFocus.values) {
-        for (final m in [15, 20, 30, 45, 60]) {
+        for (final m in [10, 15, 20, 25, 30, 40, 45, 60, 90]) {
           for (final type in [SessionType.fullA, SessionType.lowerA,
               SessionType.cardioCore]) {
             final w = WorkoutPlanner.build(
@@ -261,5 +262,22 @@ void main() {
       expect(b.stretching, greaterThan(0));
       expect(b.total, w.minutes);
     });
+  });
+
+  test('a different length just this week', () {
+    final monday = DateTime(2026, 10, 19);
+    final sun = DateTime(2026, 10, 25);
+    final p = _prefs(days: {7}).copyWith(minutesByDay: {7: 40});
+    ScheduleChange? change(DateTime d) => d == sun
+        ? ScheduleChange(originalDay: sun, minutes: 20, updatedAt: DateTime(2026))
+        : null;
+    final thisWeek =
+        WorkoutPlanner.weekSchedule(p, Units.imperial, monday, changeFor: change);
+    final nextWeek = WorkoutPlanner.weekSchedule(
+        p, Units.imperial, monday.add(const Duration(days: 7)),
+        changeFor: change);
+    expect(thisWeek.on(sun)!.workout.minutes, inInclusiveRange(16, 22));
+    expect(thisWeek.on(sun)!.lengthThisWeek, 20);
+    expect(nextWeek.scheduled.single.workout.minutes, inInclusiveRange(36, 42));
   });
 }

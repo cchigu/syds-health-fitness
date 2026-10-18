@@ -5,6 +5,7 @@ import '../services/profile_repository.dart';
 import '../services/workout_planner.dart';
 import '../services/workout_repository.dart';
 import '../utils/dates.dart';
+import '../widgets/minutes_stepper.dart';
 import '../widgets/time_breakdown.dart';
 import 'workout_detail_screen.dart';
 import 'workout_setup_screen.dart';
@@ -57,82 +58,131 @@ class WorkoutsScreen extends StatelessWidget {
 
   // ------------------------------------------------------- move / skip
 
+  /// Change one workout for this week only: move it, change its length,
+  /// or skip it.
   Future<void> _moveOrSkip(BuildContext context, ScheduledWorkout s,
       WeekSchedule week) async {
     final repo = WorkoutScheduleRepository.instance;
     final monday = _monday(s.originalDay);
     final text = Theme.of(context).textTheme;
+    final usual = s.usualMinutes ?? s.workout.minutes;
+    var length = s.lengthThisWeek ?? usual;
 
     final choice = await showModalBottomSheet<Object>(
       context: context,
       showDragHandle: true,
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(s.workout.title, style: text.titleLarge),
-              const SizedBox(height: 4),
-              Text(
-                'Just for this week — your regular days stay the same.',
-                style: text.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              Text('Move it to', style: text.titleSmall),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (var d = 0; d < 7; d++)
-                    () {
-                      final day = monday.add(Duration(days: d));
-                      final taken = week.on(day);
-                      final isHere = isSameDay(day, s.day);
-                      final free = taken == null || identical(taken, s);
-                      return ChoiceChip(
-                        label: Text('${_dayNames[d]} ${day.day}'),
-                        selected: isHere,
-                        onSelected: free && !isHere
-                            ? (_) => Navigator.pop(ctx, day)
-                            : null,
-                      );
-                    }(),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Days that already have a workout are greyed out.',
-                style: text.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              if (s.moved)
-                OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(ctx, 'restore'),
-                  icon: const Icon(Icons.undo),
-                  label: Text(
-                      'Put back on ${_fullDayNames[s.originalDay.weekday - 1]}'),
+      isScrollControlled: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) => SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(s.workout.title, style: text.titleLarge),
+                const SizedBox(height: 4),
+                Text(
+                  'Just for this week — your regular plan stays the same.',
+                  style: text.bodySmall,
                 ),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => Navigator.pop(ctx, 'skip'),
-                icon: const Icon(Icons.event_busy),
-                label: const Text('Skip it this week'),
-              ),
-            ],
+                const SizedBox(height: 16),
+
+                // Length this week
+                Text('Length this week', style: text.titleSmall),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    MinutesStepper(
+                      value: length,
+                      onChanged: (m) => setLocal(() => length = m),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Usually $usual min',
+                          style: text.bodySmall),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: length == (s.lengthThisWeek ?? usual)
+                          ? null
+                          : () => Navigator.pop(ctx, ('minutes', length)),
+                      child: const Text('Save length'),
+                    ),
+                    const SizedBox(width: 8),
+                    if (s.lengthThisWeek != null)
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx, ('minutes', null)),
+                        child: Text('Back to $usual min'),
+                      ),
+                  ],
+                ),
+                const Divider(height: 28),
+
+                // Move
+                Text('Move it to', style: text.titleSmall),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (var d = 0; d < 7; d++)
+                      () {
+                        final day = monday.add(Duration(days: d));
+                        final taken = week.on(day);
+                        final isHere = isSameDay(day, s.day);
+                        final free = taken == null || identical(taken, s);
+                        return ChoiceChip(
+                          label: Text('${_dayNames[d]} ${day.day}'),
+                          selected: isHere,
+                          onSelected: free && !isHere
+                              ? (_) => Navigator.pop(ctx, day)
+                              : null,
+                        );
+                      }(),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Days that already have a workout are greyed out.',
+                  style: text.bodySmall,
+                ),
+                if (s.moved)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: OutlinedButton.icon(
+                      onPressed: () => Navigator.pop(ctx, 'back'),
+                      icon: const Icon(Icons.undo),
+                      label: Text('Put back on '
+                          '${_fullDayNames[s.originalDay.weekday - 1]}'),
+                    ),
+                  ),
+                const Divider(height: 28),
+                TextButton.icon(
+                  onPressed: () => Navigator.pop(ctx, 'skip'),
+                  icon: const Icon(Icons.event_busy),
+                  label: const Text('Skip it this week'),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
     if (choice == null) return;
-    if (choice is DateTime) {
-      await repo.move(s.originalDay, choice);
-    } else if (choice == 'skip') {
-      await repo.skip(s.originalDay);
-    } else if (choice == 'restore') {
-      await repo.restore(s.originalDay);
+    switch (choice) {
+      case DateTime day:
+        await repo.move(s.originalDay, day);
+      case 'back':
+        await repo.move(s.originalDay, s.originalDay);
+      case 'skip':
+        await repo.skip(s.originalDay);
+      case ('minutes', final int? m):
+        await repo.setMinutes(s.originalDay, m);
     }
   }
 
@@ -273,6 +323,8 @@ class WorkoutsScreen extends StatelessWidget {
                           if (todays.moved)
                             'moved from '
                                 '${_fullDayNames[todays.originalDay.weekday - 1]}',
+                          if (todays.lengthThisWeek != null)
+                            'usually ${todays.usualMinutes} min',
                         ].join(' · '),
                   style: TextStyle(color: colors.onPrimaryContainer),
                 ),
@@ -304,7 +356,7 @@ class WorkoutsScreen extends StatelessWidget {
                         TextButton(
                           onPressed: () =>
                               _moveOrSkip(context, todays, week),
-                          child: const Text('Move or skip'),
+                          child: const Text('Change this week'),
                         ),
                     ],
                   )
@@ -335,7 +387,8 @@ class WorkoutsScreen extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 2, 8, 4),
           child: Text(
-            'Tap ⋮ to move or skip a workout just for this week.',
+            'Tap ⋮ to move, shorten or lengthen, or skip a workout just for '
+            'this week.',
             style: text.bodySmall?.copyWith(color: colors.outline),
           ),
         ),
@@ -360,7 +413,8 @@ class WorkoutsScreen extends StatelessWidget {
                         '${_fullDayNames[s.originalDay.weekday - 1]}\n'
                         '${breakdownSummary(s.workout.breakdown)}'
                     : '${_fullDayNames[s.day.weekday - 1]} · '
-                        '${s.workout.minutes} min\n'
+                        '${s.workout.minutes} min'
+                        '${s.lengthThisWeek != null ? ' this week (usually ${s.usualMinutes})' : ''}\n'
                         '${breakdownSummary(s.workout.breakdown)}',
               ),
               trailing: Row(
@@ -369,7 +423,7 @@ class WorkoutsScreen extends StatelessWidget {
                   if (log.doneOn(s.day))
                     Icon(Icons.check_circle, color: colors.primary),
                   IconButton(
-                    tooltip: 'Move or skip this week',
+                    tooltip: 'Change this week',
                     icon: const Icon(Icons.more_vert),
                     onPressed: () => _moveOrSkip(context, s, week),
                   ),
@@ -390,7 +444,7 @@ class WorkoutsScreen extends StatelessWidget {
                   '${_fullDayNames[s.originalDay.weekday - 1]} · skipped this week'),
               trailing: TextButton(
                 onPressed: () => WorkoutScheduleRepository.instance
-                    .restore(s.originalDay),
+                    .unskip(s.originalDay),
                 child: const Text('Undo'),
               ),
             ),

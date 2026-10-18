@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/workout.dart';
 import '../services/workout_repository.dart';
+import '../widgets/minutes_stepper.dart';
 
 /// Five quick questions that build Syd's plan:
 /// which days, how long, main goal, experience, and anything to go easy on.
@@ -20,7 +21,6 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
   late Set<int> _days;
   late int _minutes;
   late Map<int, int> _minutesByDay;
-  static const _lengths = [15, 20, 30, 45, 60];
   WorkoutFocus? _focus;
   Experience? _experience;
   late Set<BodyArea> _avoid;
@@ -232,48 +232,49 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
   Widget _lengthPage() {
     final text = Theme.of(context).textTheme;
     final days = _days.toList()..sort();
+    const names = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+        'Saturday', 'Sunday'];
     return _question(
       'How long do you want to work out each day?',
-      'Including warm-up and stretching. Each workout is planned to fit.',
+      'Including warm-up and stretching. Each workout is planned to fit. '
+          'You can also change one day\'s length just for a single week '
+          'from the Workouts tab.',
       [
-        Text('Same for every day', style: text.titleSmall),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          children: [
-            for (final m in _lengths)
-              ActionChip(
-                label: Text('$m min'),
-                onPressed: () => setState(() {
-                  _minutes = m;
-                  for (final d in days) {
-                    _minutesByDay[d] = m;
-                  }
-                }),
-              ),
-          ],
+        Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+            child: Row(
+              children: [
+                Expanded(
+                    child: Text('Same for every day', style: text.titleSmall)),
+                MinutesStepper(
+                  value: _minutes,
+                  onChanged: (m) => setState(() {
+                    _minutes = m;
+                    for (final d in days) {
+                      _minutesByDay[d] = m;
+                    }
+                  }),
+                ),
+              ],
+            ),
+          ),
         ),
-        const SizedBox(height: 20),
-        for (final d in days) ...[
-          Text(
-            const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
-                'Saturday', 'Sunday'][d - 1],
-            style: text.titleSmall,
+        const SizedBox(height: 16),
+        for (final d in days)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+            child: Row(
+              children: [
+                Expanded(child: Text(names[d - 1], style: text.bodyLarge)),
+                MinutesStepper(
+                  value: _minutesByDay[d] ?? _minutes,
+                  onChanged: (m) => setState(() => _minutesByDay[d] = m),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 6),
-          SegmentedButton<int>(
-            showSelectedIcon: false,
-            segments: [
-              for (final m in _lengths)
-                ButtonSegment(value: m, label: Text('$m')),
-            ],
-            selected: {_minutesByDay[d] ?? _minutes},
-            onSelectionChanged: (v) =>
-                setState(() => _minutesByDay[d] = v.first),
-          ),
-          const SizedBox(height: 14),
-        ],
-        Text('Minutes per workout', style: text.bodySmall),
       ],
     );
   }
