@@ -260,7 +260,8 @@ class WorkoutPlanner {
   }
 
   static int _strengthSets(WorkoutPrefs p) => (3 + _setAdj(p)).clamp(2, 5);
-  static int _coreSets(WorkoutPrefs p) => (3 + min(_setAdj(p), 1)).clamp(2, 4);
+  static int _coreSets(WorkoutPrefs p) =>
+      (3 + min<int>(_setAdj(p), 1)).clamp(2, 4);
 
   /// How long an exercise takes, read from what it says to do.
   static double estimateMinutes(Exercise e, String prescription, WorkoutPrefs p) {
