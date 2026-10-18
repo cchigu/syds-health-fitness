@@ -95,3 +95,12 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# App icon: run `dart run flutter_launcher_icons` after changing the images.
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#78C4EC"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
