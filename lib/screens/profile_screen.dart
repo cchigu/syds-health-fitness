@@ -72,16 +72,9 @@ class ProfileScreen extends StatelessWidget {
             children: [
               // Header
               Center(
-                child: CircleAvatar(
-                  radius: 40,
-                  backgroundColor: colors.primaryContainer,
-                  child: Text(
-                    p.name.trim().isEmpty
-                        ? '♥'
-                        : p.name.trim()[0].toUpperCase(),
-                    style: text.headlineMedium
-                        ?.copyWith(color: colors.onPrimaryContainer),
-                  ),
+                child: _Avatar(
+                  photoUrl: user?.photoURL,
+                  name: p.name,
                 ),
               ),
               const SizedBox(height: 12),
@@ -191,4 +184,58 @@ class ProfileScreen extends StatelessWidget {
         title: Text(label),
         trailing: Text(value),
       );
+}
+
+/// Shows the Google profile photo when signed in with Google, otherwise
+/// the first letter of the name (or a heart before a name is set).
+class _Avatar extends StatefulWidget {
+  const _Avatar({required this.photoUrl, required this.name});
+
+  final String? photoUrl;
+  final String name;
+
+  @override
+  State<_Avatar> createState() => _AvatarState();
+}
+
+class _AvatarState extends State<_Avatar> {
+  bool _photoFailed = false;
+
+  @override
+  void didUpdateWidget(covariant _Avatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photoUrl != widget.photoUrl) _photoFailed = false;
+  }
+
+  /// Google photo links default to a tiny 96px image; ask for a sharper one.
+  String _sharper(String url) =>
+      url.replaceFirst(RegExp(r'=s\d+-c$'), '=s400-c');
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final url = widget.photoUrl;
+    final showPhoto = url != null && url.isNotEmpty && !_photoFailed;
+    final trimmed = widget.name.trim();
+
+    return CircleAvatar(
+      radius: 40,
+      backgroundColor: colors.primaryContainer,
+      backgroundImage: showPhoto ? NetworkImage(_sharper(url)) : null,
+      onBackgroundImageError: showPhoto
+          ? (_, __) {
+              if (mounted) setState(() => _photoFailed = true);
+            }
+          : null,
+      child: showPhoto
+          ? null
+          : Text(
+              trimmed.isEmpty ? '♥' : trimmed[0].toUpperCase(),
+              style: Theme.of(context)
+                  .textTheme
+                  .headlineMedium
+                  ?.copyWith(color: colors.onPrimaryContainer),
+            ),
+    );
+  }
 }
