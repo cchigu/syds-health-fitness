@@ -12,7 +12,20 @@
           "package_name": "com.cchigu.syds_health_fitness"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "563111709953-jppc7m34rpe0d5lm8o0pvu260sjra4g1.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.cchigu.syds_health_fitness",
+            "certificate_hash": "0a04597d25fe4a1ee4f3a80dc7bca986a1a6f3dd"
+          }
+        },
+        {
+          "client_id": "563111709953-qan05cjlll1g7f3s4lgv0bu5vu7j06ck.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyBoVPkMWlW8xHWbrIprTYJ0vjtbpUF3T2s"
@@ -20,7 +33,19 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "563111709953-qan05cjlll1g7f3s4lgv0bu5vu7j06ck.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "563111709953-a19kkm9eb8m56a5img07nbgl5g4spiif.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.cchigu.sydsHealthFitness"
+              }
+            }
+          ]
         }
       }
     }

@@ -57,22 +57,24 @@ class DefaultFirebaseOptions {
     projectId: 'syds-health-fitness',
     storageBucket: 'syds-health-fitness.firebasestorage.app',
   );
-
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyADH5SLgktaIMkHUK-WIQvGltb_Aw0dfrk',
     appId: '1:563111709953:ios:078fef1db96cc3dcb69f00',
     messagingSenderId: '563111709953',
     projectId: 'syds-health-fitness',
     storageBucket: 'syds-health-fitness.firebasestorage.app',
+    androidClientId: '563111709953-jppc7m34rpe0d5lm8o0pvu260sjra4g1.apps.googleusercontent.com',
+    iosClientId: '563111709953-a19kkm9eb8m56a5img07nbgl5g4spiif.apps.googleusercontent.com',
     iosBundleId: 'com.cchigu.sydsHealthFitness',
   );
-
   static const FirebaseOptions macos = FirebaseOptions(
     apiKey: 'AIzaSyADH5SLgktaIMkHUK-WIQvGltb_Aw0dfrk',
     appId: '1:563111709953:ios:078fef1db96cc3dcb69f00',
     messagingSenderId: '563111709953',
     projectId: 'syds-health-fitness',
     storageBucket: 'syds-health-fitness.firebasestorage.app',
+    androidClientId: '563111709953-jppc7m34rpe0d5lm8o0pvu260sjra4g1.apps.googleusercontent.com',
+    iosClientId: '563111709953-a19kkm9eb8m56a5img07nbgl5g4spiif.apps.googleusercontent.com',
     iosBundleId: 'com.cchigu.sydsHealthFitness',
   );
 
