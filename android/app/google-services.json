@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "563111709953",
+    "project_id": "syds-health-fitness",
+    "storage_bucket": "syds-health-fitness.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:563111709953:android:3fd7ab7cc3b1960bb69f00",
+        "android_client_info": {
+          "package_name": "com.cchigu.syds_health_fitness"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBoVPkMWlW8xHWbrIprTYJ0vjtbpUF3T2s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
