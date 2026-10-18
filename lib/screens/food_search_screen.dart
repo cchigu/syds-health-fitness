@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../config/api_keys.dart';
 import '../models/food.dart';
 import '../models/meal.dart';
 import '../models/recipe.dart';
@@ -53,6 +52,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   bool _loading = false;
   FoodSearchResult? _result;
+  StreamSubscription<FoodSearchResult>? _sub;
   _Tab _tab = _Tab.recent;
 
   bool get _picking => widget.pickAction != null;
@@ -60,6 +60,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   @override
   void dispose() {
     _debounce?.cancel();
+    _sub?.cancel();
     _query.dispose();
     super.dispose();
   }
@@ -68,24 +69,33 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     _debounce?.cancel();
     setState(() {});
     if (value.trim().length < 2) {
+      _sub?.cancel();
       setState(() {
         _result = null;
         _loading = false;
       });
       return;
     }
-    _debounce = Timer(const Duration(milliseconds: 600), _search);
+    _debounce = Timer(const Duration(milliseconds: 700), _search);
   }
 
-  Future<void> _search() async {
+  /// Results arrive per database, so whichever answers first shows first.
+  void _search() {
     final id = ++_searchId;
+    _sub?.cancel();
     setState(() => _loading = true);
-    final result = await FoodSearchService.search(_query.text);
-    if (!mounted || id != _searchId) return; // a newer search started
-    setState(() {
-      _result = result;
-      _loading = false;
-    });
+    _sub = FoodSearchService.search(_query.text).listen(
+      (result) {
+        if (!mounted || id != _searchId) return; // a newer search started
+        setState(() {
+          _result = result;
+          _loading = result.stillLoading;
+        });
+      },
+      onDone: () {
+        if (mounted && id == _searchId) setState(() => _loading = false);
+      },
+    );
   }
 
   /// Open a food: to log it (normal) or to choose an amount (pick mode).
@@ -345,13 +355,6 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   Widget _results() {
     final r = _result;
     if (r == null) return const SizedBox.shrink();
-    if (r.bothFailed) {
-      return const _Message(
-        icon: Icons.wifi_off,
-        text: 'Couldn\'t reach the food databases.\n'
-            'Check your internet connection and try again.',
-      );
-    }
     final q = _query.text;
     final words = q.toLowerCase().split(RegExp(r'\s+'))
       ..removeWhere((w) => w.isEmpty);
@@ -361,7 +364,31 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
           .map((m) => m.toFoodItem()),
       ...CustomFoodRepository.instance.search(q),
     ];
-    if (r.foods.isEmpty && mine.isEmpty && !_loading) {
+    final foods = [...mine, ...r.foods];
+
+    if (r.bothFailed && mine.isEmpty) {
+      return ListView(
+        children: [
+          _Message(
+            icon: r.offline ? Icons.wifi_off : Icons.cloud_off,
+            text: r.offline
+                ? 'No internet connection.\nCheck your Wi-Fi or data and '
+                    'try again.'
+                : '${r.usda.error}\n${r.off.error}',
+          ),
+          Center(
+            child: FilledButton.icon(
+              onPressed: _search,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Try again'),
+            ),
+          ),
+          if (!_picking) _CantFind(onCreate: _create),
+        ],
+      );
+    }
+
+    if (foods.isEmpty && !r.stillLoading) {
       return ListView(
         children: [
           const _Message(
@@ -372,22 +399,20 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         ],
       );
     }
+
     return ListView(
       children: [
-        if (r.usdaError != null)
-          _Banner(
-            ApiKeys.usingDemoUsdaKey
-                ? 'USDA search is busy (shared demo key). Showing Open Food '
-                    'Facts results only.'
-                : 'USDA search is unavailable right now. Showing Open Food '
-                    'Facts results only.',
-          ),
-        if (r.offError != null)
-          const _Banner('Open Food Facts is unavailable right now. '
-              'Showing USDA results only.'),
-        for (final f in [...mine, ...r.foods])
-          _FoodTile(food: f, onTap: () => _open(f)),
-        if (!_picking) _CantFind(onCreate: _create),
+        for (final (src, label) in [(r.usda, 'USDA'), (r.off, 'Open Food Facts')])
+          if (src.status == SourceStatus.failed)
+            _Banner(
+              '${src.error} Showing the other database\'s results.',
+              actionLabel: 'Retry',
+              onAction: _search,
+            )
+          else if (src.status == SourceStatus.loading && foods.isNotEmpty)
+            _Banner('Still searching $label…'),
+        for (final f in foods) _FoodTile(food: f, onTap: () => _open(f)),
+        if (!_picking && !r.stillLoading) _CantFind(onCreate: _create),
       ],
     );
   }
@@ -441,21 +466,31 @@ class _FoodTile extends StatelessWidget {
 }
 
 class _Banner extends StatelessWidget {
-  const _Banner(this.message);
+  const _Banner(this.message, {this.actionLabel, this.onAction});
   final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
       decoration: BoxDecoration(
         color: colors.secondaryContainer,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(message,
-          style: TextStyle(color: colors.onSecondaryContainer)),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(message,
+                style: TextStyle(color: colors.onSecondaryContainer)),
+          ),
+          if (actionLabel != null)
+            TextButton(onPressed: onAction, child: Text(actionLabel!)),
+        ],
+      ),
     );
   }
 }

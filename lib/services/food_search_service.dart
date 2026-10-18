@@ -2,72 +2,146 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import '../config/api_keys.dart';
 import '../models/food.dart';
 import '../models/nutrients.dart';
 import '../utils/units.dart';
+import 'http_helper.dart';
 
-class FoodSearchResult {
-  const FoodSearchResult(this.foods, {this.usdaError, this.offError});
+enum SourceStatus { loading, done, failed }
 
+/// How one database is doing for the current search.
+class SourceResult {
+  const SourceResult.loading()
+      : status = SourceStatus.loading,
+        foods = const [],
+        error = null,
+        offline = false;
+  const SourceResult.done(this.foods)
+      : status = SourceStatus.done,
+        error = null,
+        offline = false;
+  const SourceResult.failed(String this.error, {this.offline = false})
+      : status = SourceStatus.failed,
+        foods = const [];
+
+  final SourceStatus status;
   final List<FoodItem> foods;
-  final Object? usdaError;
-  final Object? offError;
 
-  bool get bothFailed => usdaError != null && offError != null;
+  /// What went wrong, in plain words.
+  final String? error;
+  final bool offline;
 }
 
-/// Searches USDA FoodData Central and Open Food Facts at the same time.
-///
-/// Order of results (US first, as requested):
-///   1. USDA (US generic foods, US restaurants and US brands)
-///   2. Open Food Facts products sold in the US
-///   3. Open Food Facts products from everywhere else
-class FoodSearchService {
-  FoodSearchService._();
+class FoodSearchResult {
+  const FoodSearchResult({required this.usda, required this.off});
 
-  static final http.Client _client = http.Client();
-  static const Duration _timeout = Duration(seconds: 12);
-  static const String _userAgent =
-      'SydsHealthFitness/1.0 (github.com/cchigu/syds-health-fitness)';
+  static const empty = FoodSearchResult(
+    usda: SourceResult.done([]),
+    off: SourceResult.done([]),
+  );
 
-  static Future<FoodSearchResult> search(String query) async {
-    final q = query.trim();
-    if (q.length < 2) return const FoodSearchResult([]);
+  final SourceResult usda;
+  final SourceResult off;
 
-    Object? usdaError;
-    Object? offError;
-    final results = await Future.wait([
-      _searchUsda(q).catchError((Object e) {
-        usdaError = e;
-        debugPrint('USDA search failed: $e');
-        return <FoodItem>[];
-      }),
-      _searchOff(q).catchError((Object e) {
-        offError = e;
-        debugPrint('Open Food Facts search failed: $e');
-        return <FoodItem>[];
-      }),
-    ]);
+  bool get stillLoading =>
+      usda.status == SourceStatus.loading || off.status == SourceStatus.loading;
+  bool get bothFailed =>
+      usda.status == SourceStatus.failed && off.status == SourceStatus.failed;
+  bool get offline => bothFailed && usda.offline && off.offline;
 
-    final off = results[1];
+  /// USDA first, then Open Food Facts products sold in the US, then the
+  /// rest of the world; near-duplicates removed.
+  List<FoodItem> get foods {
     final ordered = [
-      ...results[0],
-      ...off.where((f) => f.fromUs),
-      ...off.where((f) => !f.fromUs),
+      ...usda.foods,
+      ...off.foods.where((f) => f.fromUs),
+      ...off.foods.where((f) => !f.fromUs),
     ];
-
-    // Drop near-duplicates (same name and brand).
     final seen = <String>{};
-    final unique = [
+    return [
       for (final f in ordered)
         if (seen.add('${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}'))
           f,
     ];
+  }
+}
 
-    return FoodSearchResult(unique, usdaError: usdaError, offError: offError);
+/// Searches USDA FoodData Central and Open Food Facts at the same time.
+///
+/// Reliability:
+/// - Each database is asked separately and its results show up as soon as
+///   they arrive, so a slow one never holds up the other.
+/// - Every request gets one automatic retry (timeouts, dropped connections,
+///   "too many requests", server errors).
+/// - Open Food Facts uses its fast new search service, falling back to the
+///   classic one if that fails.
+/// - Recent searches are remembered, so retyping a word is instant and
+///   doesn't use up the databases' limits.
+/// - Errors say what actually happened instead of always "no internet".
+class FoodSearchService {
+  FoodSearchService._();
+
+  static const String _userAgent =
+      'SydsHealthFitness/1.0 (github.com/cchigu/syds-health-fitness)';
+
+  static final _usdaCache = _Cache();
+  static final _offCache = _Cache();
+
+  /// Emits a new result each time one of the databases answers.
+  static Stream<FoodSearchResult> search(String query) {
+    final q = query.trim().toLowerCase();
+    if (q.length < 2) return Stream.value(FoodSearchResult.empty);
+
+    final controller = StreamController<FoodSearchResult>();
+    var usda = _usdaCache[q] != null
+        ? SourceResult.done(_usdaCache[q]!)
+        : const SourceResult.loading();
+    var off = _offCache[q] != null
+        ? SourceResult.done(_offCache[q]!)
+        : const SourceResult.loading();
+
+    void emit() {
+      if (!controller.isClosed) {
+        controller.add(FoodSearchResult(usda: usda, off: off));
+      }
+    }
+
+    emit();
+    final pending = <Future<void>>[];
+
+    if (usda.status == SourceStatus.loading) {
+      pending.add(_searchUsda(q).then((foods) {
+        _usdaCache[q] = foods;
+        usda = SourceResult.done(foods);
+      }).catchError((Object e) {
+        debugPrint('USDA search failed: $e');
+        usda = SourceResult.failed(
+          ApiKeys.usingDemoUsdaKey && e is HttpStatusError && e.statusCode == 429
+              ? 'USDA\'s shared demo key has run out of searches for the hour. '
+                  'Add your own free key in secrets.json.'
+              : describeError(e, source: 'USDA'),
+          offline: looksOffline(e),
+        );
+      }).whenComplete(emit));
+    }
+
+    if (off.status == SourceStatus.loading) {
+      pending.add(_searchOff(q).then((foods) {
+        _offCache[q] = foods;
+        off = SourceResult.done(foods);
+      }).catchError((Object e) {
+        debugPrint('Open Food Facts search failed: $e');
+        off = SourceResult.failed(
+          describeError(e, source: 'Open Food Facts'),
+          offline: looksOffline(e),
+        );
+      }).whenComplete(emit));
+    }
+
+    Future.wait(pending).whenComplete(controller.close);
+    return controller.stream;
   }
 
   // ------------------------------------------------------------------ USDA
@@ -79,10 +153,8 @@ class FoodSearchService {
       'pageSize': '25',
       'dataType': 'Foundation,SR Legacy,Survey (FNDDS),Branded',
     });
-    final res = await _client.get(uri).timeout(_timeout);
-    if (res.statusCode != 200) {
-      throw Exception('USDA returned ${res.statusCode}');
-    }
+    final res = await getWithRetry(uri, timeout: const Duration(seconds: 10));
+    if (res.statusCode != 200) throw HttpStatusError(res.statusCode);
     return parseUsda(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
@@ -164,22 +236,56 @@ class FoodSearchService {
 
   // -------------------------------------------------------- Open Food Facts
 
+  static const _offFields = 'code,product_name,brands,nutriments,'
+      'serving_size,serving_quantity,countries_tags';
+
+  /// Fast search first; the classic search if that fails or finds nothing.
   static Future<List<FoodItem>> _searchOff(String q) async {
+    Object? firstError;
+    try {
+      final fast = await _searchOffFast(q);
+      if (fast.isNotEmpty) return fast;
+    } catch (e) {
+      firstError = e;
+      debugPrint('Open Food Facts fast search failed, trying classic: $e');
+    }
+    try {
+      return await _searchOffClassic(q);
+    } catch (e) {
+      throw firstError ?? e;
+    }
+  }
+
+  static Future<List<FoodItem>> _searchOffFast(String q) async {
+    final uri = Uri.https('search.openfoodfacts.org', '/search', {
+      'q': q,
+      'page_size': '24',
+      'fields': _offFields,
+    });
+    final res = await getWithRetry(
+      uri,
+      headers: {'User-Agent': _userAgent},
+      timeout: const Duration(seconds: 8),
+    );
+    if (res.statusCode != 200) throw HttpStatusError(res.statusCode);
+    return parseOff(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  static Future<List<FoodItem>> _searchOffClassic(String q) async {
     final uri = Uri.https('world.openfoodfacts.org', '/cgi/search.pl', {
       'search_terms': q,
       'search_simple': '1',
       'action': 'process',
       'json': '1',
       'page_size': '24',
-      'fields': 'code,product_name,brands,nutriments,serving_size,'
-          'serving_quantity,countries_tags',
+      'fields': _offFields,
     });
-    final res = await _client
-        .get(uri, headers: {'User-Agent': _userAgent})
-        .timeout(_timeout);
-    if (res.statusCode != 200) {
-      throw Exception('Open Food Facts returned ${res.statusCode}');
-    }
+    final res = await getWithRetry(
+      uri,
+      headers: {'User-Agent': _userAgent},
+      timeout: const Duration(seconds: 15),
+    );
+    if (res.statusCode != 200) throw HttpStatusError(res.statusCode);
     return parseOff(jsonDecode(res.body) as Map<String, dynamic>);
   }
 
@@ -187,7 +293,8 @@ class FoodSearchService {
   @visibleForTesting
   static List<FoodItem> parseOff(Map<String, dynamic> json) {
     final foods = <FoodItem>[];
-    for (final raw in (json['products'] as List?) ?? const []) {
+    final list = (json['hits'] as List?) ?? (json['products'] as List?) ?? const [];
+    for (final raw in list) {
       if (raw is! Map) continue;
       final p = Map<String, dynamic>.from(raw);
       final product = parseOffProduct(p);
@@ -198,7 +305,7 @@ class FoodSearchService {
 
   /// One Open Food Facts product (also used by barcode scanning later).
   static FoodItem? parseOffProduct(Map<String, dynamic> p) {
-    final name = (p['product_name'] as String?)?.trim() ?? '';
+    final name = '${p['product_name'] ?? ''}'.trim();
     final code = (p['code'] ?? '').toString();
     if (name.isEmpty || code.isEmpty) return null;
 
@@ -221,7 +328,11 @@ class FoodSearchService {
       servings.add(Serving(label, qty));
     }
 
-    final brands = (p['brands'] as String?)?.split(',').first.trim();
+    final rawBrands = p['brands'];
+    final brands = (rawBrands is List
+            ? (rawBrands.isEmpty ? null : '${rawBrands.first}')
+            : (rawBrands as String?)?.split(',').first)
+        ?.trim();
     final countries = (p['countries_tags'] as List?) ?? const [];
 
     return FoodItem(
@@ -262,5 +373,18 @@ class FoodSearchService {
           RegExp(r"\bMc([a-z])"),
           (m) => 'Mc${m[1]!.toUpperCase()}',
         );
+  }
+}
+
+/// Remembers the last 60 searches per database.
+class _Cache {
+  final _map = <String, List<FoodItem>>{};
+
+  List<FoodItem>? operator [](String key) => _map[key];
+
+  void operator []=(String key, List<FoodItem> value) {
+    _map.remove(key);
+    _map[key] = value;
+    if (_map.length > 60) _map.remove(_map.keys.first);
   }
 }

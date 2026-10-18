@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 
 import '../config/api_keys.dart';
 import '../models/food.dart';
 import 'custom_food_repository.dart';
 import 'food_search_service.dart';
+import 'http_helper.dart';
 
 /// Thrown when neither database could be reached (as opposed to "not found").
 class BarcodeLookupException implements Exception {
@@ -21,8 +21,6 @@ class BarcodeLookupException implements Exception {
 class BarcodeLookupService {
   BarcodeLookupService._();
 
-  static final http.Client _client = http.Client();
-  static const Duration _timeout = Duration(seconds: 12);
   static const String _userAgent =
       'SydsHealthFitness/1.0 (github.com/cchigu/syds-health-fitness)';
 
@@ -60,8 +58,8 @@ class BarcodeLookupService {
       'dataType': 'Branded',
       'pageSize': '10',
     });
-    final res = await _client.get(uri).timeout(_timeout);
-    if (res.statusCode != 200) throw Exception('USDA ${res.statusCode}');
+    final res = await getWithRetry(uri);
+    if (res.statusCode != 200) throw HttpStatusError(res.statusCode);
     return matchUsdaBarcode(
         jsonDecode(res.body) as Map<String, dynamic>, digits);
   }
@@ -88,11 +86,8 @@ class BarcodeLookupService {
             'serving_quantity,countries_tags',
       },
     );
-    final res = await _client
-        .get(uri, headers: {'User-Agent': _userAgent})
-        .timeout(_timeout);
+    final res = await getWithRetry(uri, headers: {'User-Agent': _userAgent});
     if (res.statusCode == 404) return null;
-    if (res.statusCode != 200) throw Exception('OFF ${res.statusCode}');
     final body = jsonDecode(res.body) as Map<String, dynamic>;
     final product = body['product'];
     if (body['status'] != 1 || product is! Map) return null;

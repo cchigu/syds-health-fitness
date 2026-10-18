@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:syds_health_fitness/models/food.dart';
@@ -5,6 +8,7 @@ import 'package:syds_health_fitness/models/log_entry.dart';
 import 'package:syds_health_fitness/models/meal.dart';
 import 'package:syds_health_fitness/models/nutrients.dart';
 import 'package:syds_health_fitness/services/food_search_service.dart';
+import 'package:syds_health_fitness/services/http_helper.dart';
 
 void main() {
   test('parses a USDA branded food with its serving', () {
@@ -105,5 +109,51 @@ void main() {
     expect(back.day, DateTime(2026, 10, 18));
     expect(back.meal, Meal.breakfast);
     expect(back.nutrients.calories, closeTo(89 * 2.36, 0.01));
+  });
+
+  test('reads the fast Open Food Facts search (hits, brand lists)', () {
+    final foods = FoodSearchService.parseOff({
+      'hits': [
+        {
+          'code': '123',
+          'product_name': 'Oat Milk',
+          'brands': ['Oatly'],
+          'countries_tags': ['en:united-states'],
+          'nutriments': {'energy-kcal_100g': 48},
+        },
+      ],
+    });
+    expect(foods.single.brand, 'Oatly');
+    expect(foods.single.fromUs, isTrue);
+  });
+
+  test('errors explain what actually happened', () {
+    expect(describeError(TimeoutException('x'), source: 'USDA'),
+        contains('slow'));
+    expect(describeError(const HttpStatusError(429), source: 'USDA'),
+        contains('limiting'));
+    expect(
+        describeError(const SocketException('Failed host lookup: x'),
+            source: 'USDA'),
+        'No internet connection.');
+  });
+
+  test('results show US sources first and drop duplicates', () {
+    FoodItem f(String id, String name, {bool us = false}) => FoodItem(
+          id: id,
+          name: name,
+          source: FoodSource.openFoodFacts,
+          fromUs: us,
+          per100g: Nutrients.zero,
+        );
+    final r = FoodSearchResult(
+      usda: SourceResult.done([f('u', 'Apple', us: true)]),
+      off: SourceResult.done([
+        f('o1', 'Apfel'),
+        f('o2', 'Apple Pie', us: true),
+        f('o3', 'apple'),
+      ]),
+    );
+    expect(r.foods.map((x) => x.id), ['u', 'o2', 'o1']);
   });
 }
