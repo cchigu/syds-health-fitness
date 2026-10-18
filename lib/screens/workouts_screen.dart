@@ -7,6 +7,7 @@ import '../services/workout_repository.dart';
 import '../utils/dates.dart';
 import '../widgets/minutes_stepper.dart';
 import '../widgets/time_breakdown.dart';
+import 'records_screen.dart';
 import 'workout_detail_screen.dart';
 import 'workout_setup_screen.dart';
 
@@ -204,6 +205,13 @@ class WorkoutsScreen extends StatelessWidget {
             title: const Text('Workouts'),
             centerTitle: true,
             actions: [
+              IconButton(
+                tooltip: 'My records',
+                icon: const Icon(Icons.emoji_events_outlined),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RecordsScreen()),
+                ),
+              ),
               if (prefs != null)
                 IconButton(
                   tooltip: 'Change my plan',

@@ -3,11 +3,14 @@ import 'package:flutter/material.dart';
 import '../data/exercise_library.dart';
 import '../models/user_profile.dart';
 import '../models/workout.dart';
+import '../services/exercise_log_repository.dart';
 import '../services/profile_repository.dart';
 import '../services/workout_repository.dart';
 import '../utils/dates.dart';
 import '../utils/units.dart';
 import '../widgets/exercise_photo.dart';
+import '../widgets/exercise_stats.dart';
+import 'log_sets_sheet.dart';
 import '../widgets/time_breakdown.dart';
 
 /// One workout: warm-up, exercises, treadmill and stretches.
@@ -58,7 +61,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
 
   // ---------------------------------------------------------- exercise sheet
 
-  Future<void> _showExercise(PlannedExercise pe) async {
+  Future<void> _showExercise(PlannedExercise pe, String tickKey) async {
     final result = await showModalBottomSheet<(String, Exercise?)>(
       context: context,
       isScrollControlled: true,
@@ -67,6 +70,8 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
         planned: pe,
         canSwap: widget.canSwap && pe.slotKey != null && pe.extraIndex == null,
         canEdit: _session != null,
+        day: widget.day,
+        units: _units,
       ),
     );
     if (result == null || !mounted) return;
@@ -74,6 +79,19 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     final session = _session;
 
     switch (action) {
+      case 'log':
+        final saved = await showModalBottomSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          showDragHandle: true,
+          builder: (_) => LogSetsSheet(
+            exercise: pe.exercise,
+            day: widget.day,
+            planned: pe,
+          ),
+        );
+        if (saved == true && mounted) setState(() => _ticked.add(tickKey));
+        return;
       case 'swap':
         if (swapTo == null || pe.slotKey == null) return;
         await _prefs.swap(pe.slotKey!, swapTo.id);
@@ -378,6 +396,20 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     Navigator.of(context).pop();
   }
 
+  /// "✓ Logged: 3 × 10 @ 15 lb" for this day, else "Last: …".
+  String? _logLine(Exercise e) {
+    if (e.kind != ExerciseKind.strength && e.kind != ExerciseKind.core) {
+      return null;
+    }
+    final repo = ExerciseLogRepository.instance;
+    final today = repo.onDay(e.id, widget.day);
+    if (today != null && today.sets.isNotEmpty) {
+      return '✓ Logged: ${sessionSummary(today, _units)}';
+    }
+    final last = repo.lastBefore(e.id, widget.day);
+    return last == null ? null : 'Last: ${sessionSummary(last, _units)}';
+  }
+
   // ------------------------------------------------------------------ build
 
   @override
@@ -388,7 +420,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
     final alreadyDone = WorkoutLogRepository.instance.doneOn(widget.day);
     final editable = _session != null && _prefs.prefs != null;
 
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: ExerciseLogRepository.instance,
+      builder: (context, _) => Scaffold(
       appBar: AppBar(
         title: Text(w.title),
         actions: [
@@ -464,7 +498,9 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                     final k = _key(s, i);
                     _ticked.contains(k) ? _ticked.remove(k) : _ticked.add(k);
                   }),
-                  onOpen: () => _showExercise(w.sections[s].exercises[i]),
+                  onOpen: () =>
+                      _showExercise(w.sections[s].exercises[i], _key(s, i)),
+                  logLine: _logLine(w.sections[s].exercises[i].exercise),
                 ),
             ],
             if (editable)
@@ -498,7 +534,7 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 }
 
@@ -508,9 +544,11 @@ class _ExerciseTile extends StatelessWidget {
     required this.done,
     required this.onToggle,
     required this.onOpen,
+    this.logLine,
   });
 
   final PlannedExercise planned;
+  final String? logLine;
   final bool done;
   final VoidCallback onToggle;
   final VoidCallback onOpen;
@@ -541,7 +579,8 @@ class _ExerciseTile extends StatelessWidget {
               ? const TextStyle(decoration: TextDecoration.lineThrough)
               : null,
         ),
-        subtitle: Text(details),
+        subtitle: Text(logLine == null ? details : '$details\n$logLine'),
+        isThreeLine: logLine != null,
         trailing: planned.custom
             ? Icon(Icons.edit, size: 18, color: colors.primary)
             : const Icon(Icons.info_outline),
@@ -557,11 +596,15 @@ class _ExerciseSheet extends StatelessWidget {
     required this.planned,
     required this.canSwap,
     required this.canEdit,
+    required this.day,
+    required this.units,
   });
 
   final PlannedExercise planned;
   final bool canSwap;
   final bool canEdit;
+  final DateTime day;
+  final Units units;
 
   @override
   Widget build(BuildContext context) {
@@ -593,6 +636,21 @@ class _ExerciseSheet extends StatelessWidget {
             Text(e.equipment, style: text.bodySmall),
             const SizedBox(height: 12),
             ExercisePhotoPair(exerciseId: e.id),
+            if (e.kind == ExerciseKind.strength ||
+                e.kind == ExerciseKind.core) ...[
+              const SizedBox(height: 16),
+              ExerciseStatsCard(exerciseId: e.id, units: units),
+              const SizedBox(height: 8),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, ('log', null)),
+                icon: const Icon(Icons.edit_note),
+                label: Text(
+                  ExerciseLogRepository.instance.onDay(e.id, day) == null
+                      ? 'Log my sets'
+                      : 'Edit my sets',
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             for (var i = 0; i < e.steps.length; i++)
               Padding(

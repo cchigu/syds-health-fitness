@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'services/custom_food_repository.dart';
+import 'services/exercise_log_repository.dart';
 import 'services/food_log_repository.dart';
 import 'services/profile_repository.dart';
 import 'services/saved_meals.dart';
@@ -28,6 +29,7 @@ Future<void> main() async {
   await WorkoutPrefsRepository.instance.init();
   await WorkoutLogRepository.instance.init();
   await WorkoutScheduleRepository.instance.init();
+  await ExerciseLogRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 
