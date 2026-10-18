@@ -32,105 +32,102 @@ class WorkoutPlanner {
 
   static const _templates = <SessionType, List<List<String>>>{
     SessionType.fullA: [
-      ['goblet_squat', 'sumo_squat', 'glute_bridge'],
+      ['goblet_squat', 'sumo_squat', 'glute_bridge', 'hip_thrust_couch', 'standing_kickback'],
       ['one_arm_row', 'reverse_fly'],
-      ['floor_press', 'incline_pushup', 'tricep_kickback'],
-      ['db_rdl', 'single_leg_bridge', 'glute_bridge'],
-      ['dead_bug', 'heel_taps'],
+      ['floor_press', 'incline_pushup', 'squeeze_press', 'tricep_kickback'],
+      ['db_rdl', 'single_leg_bridge', 'single_leg_rdl', 'standing_kickback', 'glute_bridge', 'hip_thrust_couch'],
+      ['dead_bug', 'standing_crunch', 'bird_dog', 'heel_taps', 'db_side_bend'],
       ['lateral_raise', 'bicep_curl'],
       ['calf_raise', 'side_leg_raise'],
     ],
     SessionType.fullB: [
-      ['reverse_lunge', 'side_leg_raise', 'single_leg_bridge'],
-      ['floor_press', 'incline_pushup', 'tricep_kickback'],
+      ['reverse_lunge', 'side_leg_raise', 'single_leg_bridge', 'single_leg_rdl', 'standing_kickback'],
+      ['floor_press', 'incline_pushup', 'squeeze_press', 'tricep_kickback'],
       ['bent_over_row', 'one_arm_row', 'reverse_fly'],
-      ['glute_bridge', 'single_leg_bridge'],
-      ['forearm_plank', 'dead_bug', 'heel_taps'],
+      ['glute_bridge', 'hip_thrust_couch', 'standing_kickback', 'single_leg_bridge', 'single_leg_rdl'],
+      ['forearm_plank', 'dead_bug', 'standing_crunch', 'bird_dog', 'heel_taps', 'db_side_bend'],
       ['hammer_curl', 'bicep_curl'],
       ['shoulder_press', 'lateral_raise', 'tricep_kickback'],
     ],
     SessionType.fullC: [
-      ['squat_press', 'sumo_squat', 'glute_bridge'],
-      ['incline_pushup', 'floor_press', 'tricep_kickback'],
+      ['squat_press', 'sumo_squat', 'glute_bridge', 'hip_thrust_couch', 'standing_kickback'],
+      ['incline_pushup', 'floor_press', 'squeeze_press', 'tricep_kickback'],
       ['one_arm_row', 'reverse_fly'],
-      ['db_rdl', 'single_leg_bridge'],
-      ['russian_twist', 'dead_bug', 'heel_taps'],
+      ['db_rdl', 'single_leg_bridge', 'single_leg_rdl', 'standing_kickback'],
+      ['russian_twist', 'db_woodchop', 'db_side_bend', 'dead_bug', 'standing_crunch', 'bird_dog', 'heel_taps'],
       ['reverse_fly', 'hammer_curl'],
       ['side_leg_raise', 'calf_raise'],
     ],
     SessionType.upperA: [
-      ['floor_press', 'incline_pushup', 'tricep_kickback'],
+      ['floor_press', 'incline_pushup', 'squeeze_press', 'tricep_kickback'],
       ['one_arm_row', 'reverse_fly'],
       ['shoulder_press', 'lateral_raise', 'reverse_fly'],
       ['bicep_curl', 'hammer_curl'],
       ['tricep_kickback'],
-      ['dead_bug', 'heel_taps'],
+      ['dead_bug', 'standing_crunch', 'bird_dog', 'heel_taps', 'db_side_bend'],
       ['lateral_raise', 'hammer_curl'],
     ],
     SessionType.lowerA: [
-      ['goblet_squat', 'sumo_squat', 'glute_bridge'],
-      ['db_rdl', 'single_leg_bridge'],
+      ['goblet_squat', 'sumo_squat', 'glute_bridge', 'hip_thrust_couch', 'standing_kickback'],
+      ['db_rdl', 'single_leg_bridge', 'single_leg_rdl', 'standing_kickback'],
       ['reverse_lunge', 'side_leg_raise'],
-      ['glute_bridge', 'single_leg_bridge'],
+      ['glute_bridge', 'hip_thrust_couch', 'standing_kickback', 'single_leg_bridge', 'single_leg_rdl'],
       ['calf_raise', 'side_leg_raise'],
-      ['forearm_plank', 'dead_bug'],
-      ['heel_taps', 'dead_bug'],
+      ['forearm_plank', 'dead_bug', 'standing_crunch', 'bird_dog'],
+      ['heel_taps', 'standing_crunch', 'db_side_bend', 'dead_bug', 'bird_dog'],
     ],
     SessionType.upperB: [
-      ['incline_pushup', 'floor_press', 'tricep_kickback'],
+      ['incline_pushup', 'floor_press', 'squeeze_press', 'tricep_kickback'],
       ['bent_over_row', 'one_arm_row', 'reverse_fly'],
       ['lateral_raise', 'reverse_fly'],
       ['hammer_curl', 'bicep_curl'],
       ['tricep_kickback'],
-      ['side_plank', 'dead_bug'],
+      ['side_plank', 'dead_bug', 'standing_crunch', 'bird_dog'],
       ['reverse_fly', 'bicep_curl'],
     ],
     SessionType.lowerB: [
-      ['sumo_squat', 'goblet_squat', 'glute_bridge'],
-      ['single_leg_bridge', 'glute_bridge'],
-      ['db_rdl', 'single_leg_bridge'],
+      ['sumo_squat', 'goblet_squat', 'glute_bridge', 'hip_thrust_couch', 'standing_kickback'],
+      ['single_leg_bridge', 'single_leg_rdl', 'standing_kickback', 'glute_bridge', 'hip_thrust_couch'],
+      ['db_rdl', 'single_leg_bridge', 'single_leg_rdl', 'standing_kickback'],
       ['reverse_lunge', 'side_leg_raise'],
       ['side_leg_raise', 'calf_raise'],
-      ['russian_twist', 'heel_taps', 'dead_bug'],
-      ['calf_raise', 'glute_bridge'],
+      ['russian_twist', 'db_woodchop', 'db_side_bend', 'heel_taps', 'standing_crunch', 'dead_bug', 'bird_dog'],
+      ['calf_raise', 'glute_bridge', 'hip_thrust_couch', 'standing_kickback'],
     ],
     SessionType.cardioCore: [
-      ['dead_bug', 'heel_taps'],
-      ['forearm_plank', 'bird_dog', 'heel_taps'],
-      ['russian_twist', 'side_plank', 'dead_bug'],
-      ['glute_bridge', 'single_leg_bridge'],
+      ['dead_bug', 'standing_crunch', 'bird_dog', 'heel_taps', 'db_side_bend'],
+      ['forearm_plank', 'bird_dog', 'heel_taps', 'standing_crunch', 'db_side_bend'],
+      ['russian_twist', 'db_woodchop', 'db_side_bend', 'side_plank', 'dead_bug', 'standing_crunch', 'bird_dog'],
+      ['glute_bridge', 'hip_thrust_couch', 'standing_kickback', 'single_leg_bridge', 'single_leg_rdl'],
     ],
     SessionType.cardioCore2: [
-      ['bird_dog', 'dead_bug'],
-      ['side_plank', 'heel_taps'],
-      ['crunch', 'dead_bug'],
-      ['single_leg_bridge', 'glute_bridge'],
+      ['bird_dog', 'dead_bug', 'standing_crunch'],
+      ['side_plank', 'heel_taps', 'standing_crunch', 'db_side_bend'],
+      ['crunch', 'standing_crunch', 'dead_bug', 'bird_dog'],
+      ['single_leg_bridge', 'single_leg_rdl', 'standing_kickback', 'glute_bridge', 'hip_thrust_couch'],
     ],
     SessionType.mobility: [],
   };
 
   static const _cooldowns = <SessionType, List<String>>{
-    SessionType.fullA: ['hamstring_stretch', 'doorway_chest', 'figure_four',
-        'quad_stretch', 'knees_to_chest', 'seated_side_bend'],
-    SessionType.fullB: ['quad_stretch', 'cross_body_shoulder', 'hamstring_stretch',
-        'childs_pose', 'knees_to_chest', 'seated_side_bend'],
-    SessionType.fullC: ['figure_four', 'triceps_stretch', 'hip_flexor_stretch',
-        'hamstring_stretch', 'knees_to_chest', 'seated_side_bend'],
-    SessionType.upperA: ['doorway_chest', 'cross_body_shoulder',
-        'triceps_stretch', 'wrist_stretch', 'seated_side_bend', 'cat_cow'],
-    SessionType.upperB: ['cross_body_shoulder', 'triceps_stretch',
-        'doorway_chest', 'neck_stretch', 'seated_side_bend', 'childs_pose'],
-    SessionType.lowerA: ['hamstring_stretch', 'quad_stretch', 'figure_four',
-        'calf_stretch', 'knees_to_chest', 'seated_side_bend'],
-    SessionType.lowerB: ['hip_flexor_stretch', 'hamstring_stretch',
-        'figure_four', 'calf_stretch', 'knees_to_chest', 'spinal_twist'],
-    SessionType.cardioCore: ['calf_stretch', 'hamstring_stretch',
-        'knees_to_chest', 'spinal_twist', 'seated_side_bend'],
-    SessionType.cardioCore2: ['hip_flexor_stretch', 'hamstring_stretch',
-        'knees_to_chest', 'cat_cow', 'seated_side_bend'],
-    SessionType.mobility: ['cat_cow', 'hamstring_stretch', 'figure_four',
-        'doorway_chest', 'cross_body_shoulder', 'spinal_twist',
-        'knees_to_chest', 'calf_stretch', 'neck_stretch', 'seated_side_bend'],
+    SessionType.fullA: ['hamstring_stretch', 'standing_hamstring_stretch', 'doorway_chest', 'figure_four', 'chair_figure_four', 'quad_stretch', 'knees_to_chest', 'standing_knee_hug', 'seated_side_bend'],
+    SessionType.fullB: ['quad_stretch', 'cross_body_shoulder', 'hamstring_stretch', 'standing_hamstring_stretch', 'childs_pose', 'knees_to_chest', 'standing_knee_hug', 'seated_side_bend'],
+    SessionType.fullC: ['figure_four', 'chair_figure_four', 'triceps_stretch', 'hip_flexor_stretch', 'hamstring_stretch', 'standing_hamstring_stretch', 'knees_to_chest', 'standing_knee_hug', 'seated_side_bend'],
+    SessionType.upperA: ['doorway_chest', 'cross_body_shoulder', 'triceps_stretch', 'wrist_stretch', 'seated_side_bend', 'cat_cow'],
+    SessionType.upperB: ['cross_body_shoulder', 'triceps_stretch', 'doorway_chest', 'neck_stretch', 'seated_side_bend', 'childs_pose'],
+    SessionType.lowerA: ['hamstring_stretch', 'standing_hamstring_stretch', 'quad_stretch', 'figure_four', 'chair_figure_four', 'calf_stretch', 'knees_to_chest', 'standing_knee_hug', 'seated_side_bend'],
+    SessionType.lowerB: ['hip_flexor_stretch', 'hamstring_stretch', 'standing_hamstring_stretch', 'figure_four', 'chair_figure_four', 'calf_stretch', 'knees_to_chest', 'standing_knee_hug', 'spinal_twist', 'chair_twist'],
+    SessionType.cardioCore: ['calf_stretch', 'hamstring_stretch', 'standing_hamstring_stretch', 'knees_to_chest', 'standing_knee_hug', 'spinal_twist', 'chair_twist', 'seated_side_bend'],
+    SessionType.cardioCore2: ['hip_flexor_stretch', 'hamstring_stretch', 'standing_hamstring_stretch', 'knees_to_chest', 'standing_knee_hug', 'cat_cow', 'seated_side_bend'],
+    SessionType.mobility: ['cat_cow', 'hamstring_stretch', 'standing_hamstring_stretch', 'figure_four', 'chair_figure_four', 'doorway_chest', 'cross_body_shoulder', 'spinal_twist', 'chair_twist', 'knees_to_chest', 'standing_knee_hug', 'calf_stretch', 'neck_stretch', 'seated_side_bend'],
+  };
+
+  /// Tailbone-friendly stretches and the floor stretch each one replaces.
+  static const _standInFor = {
+    'standing_hamstring_stretch': 'hamstring_stretch',
+    'chair_figure_four': 'figure_four',
+    'standing_knee_hug': 'knees_to_chest',
+    'chair_twist': 'spinal_twist',
   };
 
   static List<SessionType> splitFor(int days) => switch (days) {
@@ -640,13 +637,22 @@ class WorkoutPlanner {
       ..._cooldowns[type]!,
       // Safe fallbacks if some were excluded.
       'knees_to_chest', 'seated_side_bend', 'hamstring_stretch',
+      'standing_knee_hug', 'standing_hamstring_stretch', 'chair_twist',
     ];
     final out = <PlannedExercise>[];
     final used = <String>{};
     for (final id in ids) {
       if (out.length >= count) break;
       final e = ExerciseLibrary.byId(id);
-      if (!e.allowedFor(p.avoid) || !used.add(id)) continue;
+      if (!e.allowedFor(p.avoid) || used.contains(id)) continue;
+      // A stand-in (e.g. the standing hamstring stretch) is only used when
+      // the stretch it replaces had to be left out.
+      final original = _standInFor[id];
+      if (original != null &&
+          ExerciseLibrary.byId(original).allowedFor(p.avoid)) {
+        continue;
+      }
+      used.add(id);
       out.add(PlannedExercise(
         exercise: e,
         prescription: 'Hold 30 s${e.perSide ? ' each side' : ''}',

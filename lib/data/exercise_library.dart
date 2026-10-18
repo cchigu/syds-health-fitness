@@ -101,6 +101,7 @@ class ExerciseLibrary {
     'glute_bridge': Exercise(
       id: 'glute_bridge',
       name: 'Dumbbell glute bridge',
+      stresses: {BodyArea.tailbone},
       kind: ExerciseKind.strength,
       equipment: '1 dumbbell',
       weightLb: (10, 25),
@@ -115,6 +116,7 @@ class ExerciseLibrary {
     'single_leg_bridge': Exercise(
       id: 'single_leg_bridge',
       name: 'Single-leg glute bridge',
+      stresses: {BodyArea.tailbone},
       kind: ExerciseKind.strength,
       perSide: true,
       steps: [
@@ -156,7 +158,7 @@ class ExerciseLibrary {
       name: 'Dumbbell floor press',
       kind: ExerciseKind.strength,
       equipment: '2 dumbbells',
-      stresses: {BodyArea.shoulders, BodyArea.wrists},
+      stresses: {BodyArea.shoulders, BodyArea.wrists, BodyArea.tailbone},
       weightLb: (10, 25),
       steps: [
         'Lie on your back, knees bent, a dumbbell in each hand, elbows on the '
@@ -310,6 +312,7 @@ class ExerciseLibrary {
     'dead_bug': Exercise(
       id: 'dead_bug',
       name: 'Dead bug',
+      stresses: {BodyArea.tailbone},
       kind: ExerciseKind.core,
       perSide: true,
       steps: [
@@ -351,7 +354,7 @@ class ExerciseLibrary {
       name: 'Russian twist',
       kind: ExerciseKind.core,
       equipment: '1 dumbbell',
-      stresses: {BodyArea.lowerBack},
+      stresses: {BodyArea.lowerBack, BodyArea.tailbone},
       weightLb: (5, 15),
       steps: [
         'Sit with knees bent and lean back slightly, holding a dumbbell at '
@@ -377,6 +380,7 @@ class ExerciseLibrary {
     'heel_taps': Exercise(
       id: 'heel_taps',
       name: 'Lying heel taps',
+      stresses: {BodyArea.tailbone},
       kind: ExerciseKind.core,
       perSide: true,
       steps: [
@@ -390,13 +394,169 @@ class ExerciseLibrary {
       id: 'crunch',
       name: 'Crunch',
       kind: ExerciseKind.core,
-      stresses: {BodyArea.neck},
+      stresses: {BodyArea.neck, BodyArea.tailbone},
       steps: [
         'Lie on your back, knees bent, fingertips lightly behind your ears.',
         'Curl your shoulders off the floor using your abs.',
         'Lower slowly.',
       ],
       tip: 'Don\'t pull on your head.',
+    ),
+
+    // ------------------------------------- tailbone-friendly alternatives
+    // Standing, kneeling, couch or chair versions of floor exercises, so
+    // nothing presses on the tailbone.
+    'hip_thrust_couch': Exercise(
+      id: 'hip_thrust_couch',
+      name: 'Couch hip thrust',
+      kind: ExerciseKind.strength,
+      equipment: '1 dumbbell + couch',
+      weightLb: (10, 25),
+      steps: [
+        'Sit on the front edge of the couch, feet flat and wide. Slide '
+            'your hips forward off the seat until only your upper back '
+            '(shoulder blades) rests on it — your bottom never touches '
+            'the floor.',
+        'Hold a dumbbell on your hips.',
+        'Push through your heels and squeeze your glutes to lift your hips '
+            'until your body is flat from shoulders to knees.',
+        'Lower until your hips are just above the floor, then lift again.',
+      ],
+      tip: 'Same glute work as a bridge without lying on the floor.',
+    ),
+    'standing_kickback': Exercise(
+      id: 'standing_kickback',
+      name: 'Standing glute kickback',
+      kind: ExerciseKind.strength,
+      perSide: true,
+      steps: [
+        'Stand holding a counter or chair back, leaning forward slightly.',
+        'Keeping your leg straight, push one heel back and up, squeezing '
+            'the glute.',
+        'Lower with control. Do all reps, then switch legs.',
+      ],
+      tip: 'Hold a light dumbbell behind your knee to make it harder.',
+    ),
+    'single_leg_rdl': Exercise(
+      id: 'single_leg_rdl',
+      name: 'Single-leg Romanian deadlift',
+      kind: ExerciseKind.strength,
+      equipment: '1 dumbbell',
+      stresses: {BodyArea.ankles},
+      weightLb: (5, 20),
+      perSide: true,
+      steps: [
+        'Stand on one leg holding a dumbbell in the opposite hand (touch a '
+            'wall with your free hand for balance).',
+        'Hinge at the hip, reaching the weight toward the floor as your free '
+            'leg goes straight back.',
+        'Stop at a hamstring stretch, then squeeze back up. Switch sides.',
+      ],
+    ),
+    'standing_crunch': Exercise(
+      id: 'standing_crunch',
+      name: 'Standing knee-to-elbow crunch',
+      kind: ExerciseKind.core,
+      perSide: true,
+      steps: [
+        'Stand tall with fingertips behind your ears.',
+        'Lift one knee across your body while bringing the opposite elbow '
+            'down to meet it, crunching your abs.',
+        'Return and switch sides.',
+      ],
+      tip: 'Go slow and really squeeze — speed makes it easier.',
+    ),
+    'db_side_bend': Exercise(
+      id: 'db_side_bend',
+      name: 'Standing side bend',
+      kind: ExerciseKind.core,
+      equipment: '1 dumbbell',
+      perSide: true,
+      weightLb: (10, 25),
+      steps: [
+        'Stand tall holding a dumbbell in one hand at your side.',
+        'Slowly bend sideways toward the weight, then use your opposite '
+            'side to pull yourself back up straight.',
+        'Do all reps, then switch hands.',
+      ],
+    ),
+    'db_woodchop': Exercise(
+      id: 'db_woodchop',
+      name: 'Standing dumbbell woodchop',
+      kind: ExerciseKind.core,
+      equipment: '1 dumbbell',
+      stresses: {BodyArea.lowerBack},
+      weightLb: (5, 12),
+      perSide: true,
+      steps: [
+        'Hold one dumbbell with both hands by your outside hip, knees soft.',
+        'Rotate and lift it diagonally across your body to above the '
+            'opposite shoulder.',
+        'Lower back along the same path. Do all reps, then switch sides.',
+      ],
+    ),
+    'squeeze_press': Exercise(
+      id: 'squeeze_press',
+      name: 'Standing squeeze press',
+      kind: ExerciseKind.strength,
+      equipment: '1 dumbbell',
+      stresses: {BodyArea.shoulders},
+      weightLb: (5, 15),
+      steps: [
+        'Stand tall and squeeze one dumbbell between your palms at chest '
+            'height.',
+        'Keep squeezing hard as you press it straight out in front of you.',
+        'Bring it back to your chest. Your chest does the work.',
+      ],
+    ),
+    'standing_hamstring_stretch': Exercise(
+      id: 'standing_hamstring_stretch',
+      name: 'Standing hamstring stretch',
+      kind: ExerciseKind.stretch,
+      timeBased: true,
+      perSide: true,
+      steps: [
+        'Put one heel on a low step or the bottom stair, leg straight.',
+        'Keep your back flat and hinge forward from your hips until you '
+            'feel a stretch behind the leg.',
+      ],
+    ),
+    'chair_figure_four': Exercise(
+      id: 'chair_figure_four',
+      name: 'Chair figure-four stretch',
+      kind: ExerciseKind.stretch,
+      timeBased: true,
+      perSide: true,
+      stresses: {BodyArea.hips},
+      steps: [
+        'Sit tall on a cushioned chair and cross one ankle over the opposite '
+            'knee.',
+        'Keeping your back straight, lean forward gently until you feel it '
+            'in the crossed hip.',
+      ],
+    ),
+    'standing_knee_hug': Exercise(
+      id: 'standing_knee_hug',
+      name: 'Standing knee hug',
+      kind: ExerciseKind.stretch,
+      timeBased: true,
+      perSide: true,
+      steps: [
+        'Stand near a wall for balance.',
+        'Lift one knee and hug it gently toward your chest, standing tall.',
+      ],
+    ),
+    'chair_twist': Exercise(
+      id: 'chair_twist',
+      name: 'Seated chair twist',
+      kind: ExerciseKind.stretch,
+      timeBased: true,
+      perSide: true,
+      steps: [
+        'Sit tall on a cushioned chair, feet flat.',
+        'Turn your chest to one side, holding the chair back gently, and '
+            'breathe. Switch sides.',
+      ],
     ),
 
     // --------------------------------------------------------------- cardio
@@ -460,6 +620,7 @@ class ExerciseLibrary {
     'hamstring_stretch': Exercise(
       id: 'hamstring_stretch',
       name: 'Hamstring stretch',
+      stresses: {BodyArea.tailbone},
       kind: ExerciseKind.stretch,
       timeBased: true,
       perSide: true,
@@ -500,7 +661,7 @@ class ExerciseLibrary {
       kind: ExerciseKind.stretch,
       timeBased: true,
       perSide: true,
-      stresses: {BodyArea.hips},
+      stresses: {BodyArea.hips, BodyArea.tailbone},
       steps: [
         'Lie on your back, knees bent. Cross one ankle over the opposite knee.',
         'Pull the bottom leg toward your chest until you feel it in the '
@@ -510,6 +671,7 @@ class ExerciseLibrary {
     'knees_to_chest': Exercise(
       id: 'knees_to_chest',
       name: 'Knees to chest',
+      stresses: {BodyArea.tailbone},
       kind: ExerciseKind.stretch,
       timeBased: true,
       steps: [
@@ -606,7 +768,7 @@ class ExerciseLibrary {
       kind: ExerciseKind.stretch,
       timeBased: true,
       perSide: true,
-      stresses: {BodyArea.lowerBack},
+      stresses: {BodyArea.lowerBack, BodyArea.tailbone},
       steps: [
         'Lie on your back, arms out wide. Drop both bent knees gently to one '
             'side and look the other way.',

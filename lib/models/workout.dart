@@ -3,7 +3,18 @@ import '../utils/dates.dart';
 
 /// Parts of the body Syd may want to go easy on. Exercises that load an
 /// area she picks are left out of her plan.
-enum BodyArea { knees, lowerBack, shoulders, wrists, hips, ankles, neck }
+enum BodyArea {
+  knees,
+  lowerBack,
+  shoulders,
+  wrists,
+  hips,
+  ankles,
+  neck,
+
+  /// No lying on her back or sitting on the floor.
+  tailbone,
+}
 
 extension BodyAreaLabel on BodyArea {
   String get label => switch (this) {
@@ -14,6 +25,7 @@ extension BodyAreaLabel on BodyArea {
         BodyArea.hips => 'Hips',
         BodyArea.ankles => 'Ankles',
         BodyArea.neck => 'Neck',
+        BodyArea.tailbone => 'Tailbone (no lying on my back)',
       };
 }
 

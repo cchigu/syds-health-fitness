@@ -280,4 +280,36 @@ void main() {
     expect(thisWeek.on(sun)!.lengthThisWeek, 20);
     expect(nextWeek.scheduled.single.workout.minutes, inInclusiveRange(36, 42));
   });
+
+  group('tailbone', () {
+    test('nothing lying on the back or sitting on the floor', () {
+      final plan = WorkoutPlanner.weekPlan(
+        _prefs(days: {1, 2, 3, 4, 5, 6, 7}, minutes: 60,
+            avoid: {BodyArea.tailbone}),
+        Units.imperial,
+      );
+      for (final w in plan.values) {
+        for (final pe in _all(w)) {
+          expect(pe.exercise.stresses, isNot(contains(BodyArea.tailbone)),
+              reason: pe.exercise.name);
+        }
+      }
+    });
+
+    test('closest stand-ins replace floor exercises', () {
+      final w = WorkoutPlanner.build(SessionType.lowerA,
+          _prefs(avoid: {BodyArea.tailbone}, minutes: 60), Units.imperial);
+      final ids = _all(w).map((e) => e.exercise.id).toSet();
+      expect(ids, isNot(contains('glute_bridge')));
+      expect(ids, contains('standing_hamstring_stretch'));
+    });
+
+    test('without it, no duplicate standing stretches', () {
+      final w = WorkoutPlanner.build(
+          SessionType.fullA, _prefs(minutes: 60), Units.imperial);
+      final ids = _all(w).map((e) => e.exercise.id).toList();
+      expect(ids, contains('hamstring_stretch'));
+      expect(ids, isNot(contains('standing_hamstring_stretch')));
+    });
+  });
 }
