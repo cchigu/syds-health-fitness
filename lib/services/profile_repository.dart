@@ -6,7 +6,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/nutrients.dart';
 import '../models/user_profile.dart';
+import 'goal_calculator.dart';
 
 /// Keeps the profile on the phone and, when signed in, in the cloud.
 ///
@@ -22,6 +24,18 @@ class ProfileRepository extends ChangeNotifier {
 
   UserProfile _profile = UserProfile.empty();
   UserProfile get profile => _profile;
+
+  /// The recommended goals for the current profile (null until complete).
+  GoalBreakdown? get recommendation => GoalCalculator.recommend(_profile);
+
+  /// The goals actually in use: custom ones if set, otherwise recommended.
+  Nutrients? get goals => _profile.customGoals ?? recommendation?.goals;
+
+  bool get usingCustomGoals => _profile.customGoals != null;
+
+  /// Save custom goals, or pass null to switch back to recommended.
+  Future<void> setCustomGoals(Nutrients? goals) =>
+      update(_profile.withCustomGoals(goals));
 
   User? _user;
   User? get user => _user;

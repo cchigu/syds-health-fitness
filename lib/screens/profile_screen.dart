@@ -5,6 +5,7 @@ import '../services/auth_service.dart';
 import '../services/profile_repository.dart';
 import '../utils/units.dart';
 import 'edit_profile_screen.dart';
+import 'goals_screen.dart';
 import 'sign_in_screen.dart';
 
 /// Profile tab: cloud account, body stats and settings.
@@ -153,6 +154,24 @@ class ProfileScreen extends StatelessWidget {
                     onTap: () => _openEdit(context),
                   ),
                 ),
+
+              // Daily goals
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.flag_outlined),
+                  title: const Text('Daily goals'),
+                  subtitle: Text(
+                    repo.goals == null
+                        ? 'Finish your profile to get goals'
+                        : '${repo.goals!.calories.round()} calories · '
+                            '${repo.usingCustomGoals ? 'custom' : 'recommended'}',
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const GoalsScreen()),
+                  ),
+                ),
+              ),
 
               // Details
               Card(

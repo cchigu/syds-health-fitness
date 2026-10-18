@@ -146,6 +146,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       goal: _goal,
       units: _units,
       updatedAt: DateTime.now(),
+      customGoals: ProfileRepository.instance.profile.customGoals,
     ));
     if (mounted) Navigator.of(context).pop();
   }

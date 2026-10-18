@@ -4,6 +4,8 @@
 /// the [units] setting only changes how they are shown and typed in.
 library;
 
+import 'nutrients.dart';
+
 enum Sex { female, male }
 
 enum ActivityLevel { sedentary, light, moderate, active, veryActive }
@@ -57,6 +59,7 @@ class UserProfile {
     required this.goal,
     required this.units,
     required this.updatedAt,
+    this.customGoals,
   });
 
   final String name;
@@ -71,6 +74,10 @@ class UserProfile {
   /// When this profile was last edited; used to decide whether the phone's
   /// copy or the cloud copy is newer.
   final DateTime updatedAt;
+
+  /// Goals Syd typed in herself. Null means "use the recommended goals",
+  /// which update automatically whenever the profile changes.
+  final Nutrients? customGoals;
 
   static UserProfile empty() => UserProfile(
         name: '',
@@ -105,7 +112,15 @@ class UserProfile {
     return years;
   }
 
-  UserProfile copyWith({DateTime? updatedAt}) => UserProfile(
+  UserProfile copyWith({DateTime? updatedAt}) => withCustomGoals(
+        customGoals,
+        updatedAt: updatedAt,
+      );
+
+  /// Same profile with different custom goals (pass null to go back to
+  /// the recommended goals).
+  UserProfile withCustomGoals(Nutrients? goals, {DateTime? updatedAt}) =>
+      UserProfile(
         name: name,
         sex: sex,
         birthDate: birthDate,
@@ -115,6 +130,7 @@ class UserProfile {
         goal: goal,
         units: units,
         updatedAt: updatedAt ?? this.updatedAt,
+        customGoals: goals,
       );
 
   Map<String, dynamic> toMap() => {
@@ -127,6 +143,7 @@ class UserProfile {
         'goal': goal.name,
         'units': units.name,
         'updatedAt': updatedAt.millisecondsSinceEpoch,
+        'customGoals': customGoals?.toMap(),
       };
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
@@ -150,6 +167,10 @@ class UserProfile {
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
         (map['updatedAt'] as num?)?.toInt() ?? 0,
       ),
+      customGoals: map['customGoals'] is Map
+          ? Nutrients.fromMap(
+              Map<String, dynamic>.from(map['customGoals'] as Map))
+          : null,
     );
   }
 }
