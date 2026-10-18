@@ -25,6 +25,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late Goal _goal;
   late Units _units;
 
+  // The exact saved values, kept until the field is retyped. Switching units
+  // reuses these instead of re-converting rounded numbers (174 cm -> 5' 9"
+  // -> 175 cm, or 150 lbs -> 68 kg -> 149.9 lbs).
+  double? _exactHeightCm;
+  double? _exactWeightKg;
+
   @override
   void initState() {
     super.initState();
@@ -35,6 +41,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _activity = p.activityLevel;
     _goal = p.goal;
     _units = p.units;
+    _exactHeightCm = p.heightCm;
+    _exactWeightKg = p.weightKg;
     _fillMeasurements(p.heightCm, p.weightKg);
   }
 
@@ -52,6 +60,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       double.tryParse(c.text.trim().replaceAll(',', '.'));
 
   double? _currentHeightCm() {
+    if (_exactHeightCm != null) return _exactHeightCm;
     if (_units == Units.metric) return _parse(_cm);
     final ft = _parse(_feet);
     final inch = _parse(_inches);
@@ -60,6 +69,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   double? _currentWeightKg() {
+    if (_exactWeightKg != null) return _exactWeightKg;
     final w = _parse(_weight);
     if (w == null) return null;
     return _units == Units.imperial ? lbToKg(w) : w;
@@ -215,6 +225,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Expanded(
                     child: TextField(
                       controller: _feet,
+                      onChanged: (_) => _exactHeightCm = null,
                       keyboardType: TextInputType.number,
                       decoration: _box('Height', suffix: 'ft'),
                     ),
@@ -223,6 +234,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Expanded(
                     child: TextField(
                       controller: _inches,
+                      onChanged: (_) => _exactHeightCm = null,
                       keyboardType: TextInputType.number,
                       decoration: _box('', suffix: 'in'),
                     ),
@@ -232,12 +244,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             else
               TextField(
                 controller: _cm,
+                onChanged: (_) => _exactHeightCm = null,
                 keyboardType: numberKeyboard,
                 decoration: _box('Height', suffix: 'cm'),
               ),
             const SizedBox(height: 12),
             TextField(
               controller: _weight,
+              onChanged: (_) => _exactWeightKg = null,
               keyboardType: numberKeyboard,
               decoration:
                   _box('Current weight', suffix: imperial ? 'lbs' : 'kg'),
