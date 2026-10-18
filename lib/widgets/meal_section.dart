@@ -13,6 +13,7 @@ class MealSection extends StatelessWidget {
     required this.onAdd,
     required this.onScan,
     required this.onOpen,
+    required this.onSaveAsMeal,
   });
 
   final Meal meal;
@@ -20,6 +21,7 @@ class MealSection extends StatelessWidget {
   final VoidCallback onAdd;
   final VoidCallback onScan;
   final void Function(LogEntry entry) onOpen;
+  final VoidCallback onSaveAsMeal;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +43,22 @@ class MealSection extends StatelessWidget {
                 Text(meal.label, style: text.titleMedium),
                 const Spacer(),
                 Text('${total.round()} cal', style: text.titleSmall),
+                if (entries.isNotEmpty)
+                  PopupMenuButton<String>(
+                    tooltip: 'More',
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onSelected: (_) => onSaveAsMeal(),
+                    itemBuilder: (_) => const [
+                      PopupMenuItem(
+                        value: 'save',
+                        child: ListTile(
+                          leading: Icon(Icons.bookmark_add_outlined),
+                          title: Text('Save as a meal'),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

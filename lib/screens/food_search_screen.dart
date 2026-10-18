@@ -5,20 +5,42 @@ import 'package:flutter/material.dart';
 import '../config/api_keys.dart';
 import '../models/food.dart';
 import '../models/meal.dart';
+import '../models/recipe.dart';
 import '../services/custom_food_repository.dart';
 import '../services/food_log_repository.dart';
 import '../services/food_search_service.dart';
+import '../services/saved_meals.dart';
 import 'barcode_scan_screen.dart';
 import 'custom_food_screen.dart';
 import 'food_detail_screen.dart';
+import 'recipe_editor_screen.dart';
 
-/// Search the food databases (or pick a recent food) to add to a meal.
-/// Pops with true when something was added.
+enum _Tab { recent, favorites, meals }
+
+/// Search the food databases, or pick from recent foods, favorites and
+/// saved meals.
+///
+/// Normal mode adds to a meal and pops with true when something was added.
+/// Pick mode ([FoodSearchScreen.pick]) chooses an ingredient for a saved
+/// meal and pops with a [PickedFood].
 class FoodSearchScreen extends StatefulWidget {
-  const FoodSearchScreen({super.key, required this.meal, required this.day});
+  const FoodSearchScreen({super.key, required Meal this.meal, required DateTime this.day})
+      : pickTitle = null,
+        pickAction = null;
 
-  final Meal meal;
-  final DateTime day;
+  const FoodSearchScreen.pick({
+    super.key,
+    required String title,
+    required String actionLabel,
+  })  : meal = null,
+        day = null,
+        pickTitle = title,
+        pickAction = actionLabel;
+
+  final Meal? meal;
+  final DateTime? day;
+  final String? pickTitle;
+  final String? pickAction;
 
   @override
   State<FoodSearchScreen> createState() => _FoodSearchScreenState();
@@ -31,6 +53,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
   bool _loading = false;
   FoodSearchResult? _result;
+  _Tab _tab = _Tab.recent;
+
+  bool get _picking => widget.pickAction != null;
 
   @override
   void dispose() {
@@ -63,13 +88,28 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     });
   }
 
+  /// Open a food: to log it (normal) or to choose an amount (pick mode).
   Future<void> _open(FoodItem food, {Serving? serving, double? quantity}) async {
+    if (_picking) {
+      final picked = await Navigator.of(context).push<PickedFood>(
+        MaterialPageRoute(
+          builder: (_) => FoodDetailScreen.pick(
+            food: food,
+            pickLabel: widget.pickAction!,
+            initialServing: serving,
+            initialQuantity: quantity,
+          ),
+        ),
+      );
+      if (picked != null && mounted) Navigator.of(context).pop(picked);
+      return;
+    }
     final added = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => FoodDetailScreen.add(
           food: food,
-          meal: widget.meal,
-          day: widget.day,
+          meal: widget.meal!,
+          day: widget.day!,
           initialServing: serving,
           initialQuantity: quantity,
         ),
@@ -85,10 +125,20 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   }
 
   void _scan() => _openScreen(
-      BarcodeScanScreen(meal: widget.meal, day: widget.day));
+      BarcodeScanScreen(meal: widget.meal!, day: widget.day!));
 
   void _create() => _openScreen(
-      CustomFoodScreen(meal: widget.meal, day: widget.day));
+      CustomFoodScreen(meal: widget.meal!, day: widget.day!));
+
+  Future<void> _newMeal() => _editMeal(Recipe.draft(name: ''), isNew: true);
+
+  Future<void> _editMeal(Recipe r, {bool isNew = false}) => _openScreen(
+        RecipeEditorScreen(
+          recipe: r,
+          isNew: isNew,
+          logTo: _picking ? null : (widget.meal!, widget.day!),
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -96,18 +146,20 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Add to ${widget.meal.label}'),
+        title: Text(widget.pickTitle ?? 'Add to ${widget.meal!.label}'),
         actions: [
-          IconButton(
-            tooltip: 'Scan barcode',
-            icon: const Icon(Icons.qr_code_scanner),
-            onPressed: _scan,
-          ),
-          IconButton(
-            tooltip: 'Add a food from its label',
-            icon: const Icon(Icons.edit_note),
-            onPressed: _create,
-          ),
+          if (!_picking) ...[
+            IconButton(
+              tooltip: 'Scan barcode',
+              icon: const Icon(Icons.qr_code_scanner),
+              onPressed: _scan,
+            ),
+            IconButton(
+              tooltip: 'Add a food from its label',
+              icon: const Icon(Icons.edit_note),
+              onPressed: _create,
+            ),
+          ],
         ],
       ),
       body: SafeArea(
@@ -117,7 +169,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
               child: TextField(
                 controller: _query,
-                autofocus: true,
+                autofocus: !_picking,
                 textInputAction: TextInputAction.search,
                 onChanged: _onChanged,
                 onSubmitted: (_) {
@@ -141,12 +193,47 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               ),
             ),
             if (_loading) const LinearProgressIndicator(),
-            Expanded(child: searching ? _results() : _recent()),
+            if (!searching) _tabs(),
+            Expanded(
+              child: ListenableBuilder(
+                listenable: Listenable.merge([
+                  FavoritesRepository.instance,
+                  RecipeRepository.instance,
+                ]),
+                builder: (context, _) => searching
+                    ? _results()
+                    : switch (_tab) {
+                        _Tab.recent => _recent(),
+                        _Tab.favorites => _favorites(),
+                        _Tab.meals => _meals(),
+                      },
+              ),
+            ),
           ],
         ),
       ),
     );
   }
+
+  Widget _tabs() => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+        child: Wrap(
+          spacing: 8,
+          children: [
+            for (final (tab, label, icon) in const [
+              (_Tab.recent, 'Recent', Icons.history),
+              (_Tab.favorites, 'Favorites', Icons.star_border),
+              (_Tab.meals, 'My meals', Icons.restaurant_menu),
+            ])
+              ChoiceChip(
+                avatar: Icon(icon, size: 18),
+                label: Text(label),
+                selected: _tab == tab,
+                onSelected: (_) => setState(() => _tab = tab),
+              ),
+          ],
+        ),
+      );
 
   Widget _recent() {
     final recent = FoodLogRepository.instance.recent();
@@ -158,22 +245,19 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             text: 'Search for a food to get started.\n'
                 'Try "banana", "greek yogurt" or "big mac".',
           ),
-          Center(
-            child: FilledButton.tonalIcon(
-              onPressed: _scan,
-              icon: const Icon(Icons.qr_code_scanner),
-              label: const Text('Scan a barcode'),
+          if (!_picking)
+            Center(
+              child: FilledButton.tonalIcon(
+                onPressed: _scan,
+                icon: const Icon(Icons.qr_code_scanner),
+                label: const Text('Scan a barcode'),
+              ),
             ),
-          ),
         ],
       );
     }
     return ListView(
       children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
-          child: Text('Recent'),
-        ),
         for (final e in recent)
           _FoodTile(
             food: e.food,
@@ -181,6 +265,78 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             quantity: e.quantity,
             onTap: () =>
                 _open(e.food, serving: e.serving, quantity: e.quantity),
+          ),
+      ],
+    );
+  }
+
+  Widget _favorites() {
+    final favs = FavoritesRepository.instance.items;
+    if (favs.isEmpty) {
+      return const _Message(
+        icon: Icons.star_border,
+        text: 'No favorites yet.\n'
+            'Tap the ☆ on any food to keep it here for quick logging.',
+      );
+    }
+    return ListView(
+      children: [
+        for (final f in favs)
+          _FoodTile(
+            food: f.food,
+            serving: f.serving,
+            quantity: f.quantity,
+            onTap: () =>
+                _open(f.food, serving: f.serving, quantity: f.quantity),
+          ),
+      ],
+    );
+  }
+
+  Widget _meals() {
+    final meals = RecipeRepository.instance.items;
+    final text = Theme.of(context).textTheme;
+    return ListView(
+      children: [
+        if (!_picking)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            child: FilledButton.tonalIcon(
+              onPressed: _newMeal,
+              icon: const Icon(Icons.add),
+              label: const Text('New meal or recipe'),
+            ),
+          ),
+        if (meals.isEmpty)
+          const _Message(
+            icon: Icons.restaurant_menu,
+            text: 'No saved meals yet.\n'
+                'Build one here, tap "Customize" on any food (no cheese!), '
+                'or save a whole meal from the Today tab.',
+          ),
+        for (final r in meals)
+          ListTile(
+            onTap: () => _open(r.toFoodItem()),
+            leading: const Icon(Icons.restaurant_menu),
+            title: Text(r.name, maxLines: 2, overflow: TextOverflow.ellipsis),
+            subtitle: Text(
+              '${r.components.length} '
+              '${r.components.length == 1 ? 'ingredient' : 'ingredients'}'
+              '${r.servings > 1 ? ' · ${r.servings} servings' : ''}',
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('${r.perServing.calories.round()} cal',
+                    style: text.titleSmall),
+                if (!_picking)
+                  IconButton(
+                    tooltip: 'Edit meal',
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _editMeal(r),
+                  ),
+              ],
+            ),
           ),
       ],
     );
@@ -196,7 +352,15 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             'Check your internet connection and try again.',
       );
     }
-    final mine = CustomFoodRepository.instance.search(_query.text);
+    final q = _query.text;
+    final words = q.toLowerCase().split(RegExp(r'\s+'))
+      ..removeWhere((w) => w.isEmpty);
+    final mine = [
+      ...RecipeRepository.instance.items
+          .where((m) => words.every((w) => m.name.toLowerCase().contains(w)))
+          .map((m) => m.toFoodItem()),
+      ...CustomFoodRepository.instance.search(q),
+    ];
     if (r.foods.isEmpty && mine.isEmpty && !_loading) {
       return ListView(
         children: [
@@ -204,7 +368,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             icon: Icons.search_off,
             text: 'No foods found. Try fewer or different words.',
           ),
-          _CantFind(onCreate: _create),
+          if (!_picking) _CantFind(onCreate: _create),
         ],
       );
     }
@@ -223,7 +387,7 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
               'Showing USDA results only.'),
         for (final f in [...mine, ...r.foods])
           _FoodTile(food: f, onTap: () => _open(f)),
-        _CantFind(onCreate: _create),
+        if (!_picking) _CantFind(onCreate: _create),
       ],
     );
   }

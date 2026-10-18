@@ -30,6 +30,23 @@ class Nutrients {
         fiber: fiber + o.fiber,
       );
 
+  Nutrients operator -(Nutrients o) => Nutrients(
+        calories: calories - o.calories,
+        protein: protein - o.protein,
+        carbs: carbs - o.carbs,
+        fat: fat - o.fat,
+        fiber: fiber - o.fiber,
+      );
+
+  /// Nothing can go below zero (e.g. removing more cheese than there was).
+  Nutrients clampedAtZero() => Nutrients(
+        calories: calories < 0 ? 0 : calories,
+        protein: protein < 0 ? 0 : protein,
+        carbs: carbs < 0 ? 0 : carbs,
+        fat: fat < 0 ? 0 : fat,
+        fiber: fiber < 0 ? 0 : fiber,
+      );
+
   Nutrients scaled(double factor) => Nutrients(
         calories: calories * factor,
         protein: protein * factor,

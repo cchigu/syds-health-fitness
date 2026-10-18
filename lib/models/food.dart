@@ -1,13 +1,14 @@
 import '../utils/units.dart';
 import 'nutrients.dart';
 
-enum FoodSource { usda, openFoodFacts, custom }
+enum FoodSource { usda, openFoodFacts, custom, recipe }
 
 extension FoodSourceLabel on FoodSource {
   String get label => switch (this) {
         FoodSource.usda => 'USDA',
         FoodSource.openFoodFacts => 'Open Food Facts',
         FoodSource.custom => 'My food',
+        FoodSource.recipe => 'My meal',
       };
 }
 
@@ -112,4 +113,12 @@ String amountLabel(Serving serving, double quantity) {
   if (serving.isGram) return '${trimNumber(quantity)} g';
   if (quantity == 1) return serving.label;
   return '${trimNumber(quantity, decimals: 2)} × ${serving.label}';
+}
+
+/// A food plus the amount chosen for it (used when building a meal).
+class PickedFood {
+  const PickedFood(this.food, this.serving, this.quantity);
+  final FoodItem food;
+  final Serving serving;
+  final double quantity;
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/log_entry.dart';
 import '../models/meal.dart';
+import '../models/recipe.dart';
 import '../services/food_log_repository.dart';
 import '../services/profile_repository.dart';
 import '../utils/dates.dart';
@@ -11,6 +12,7 @@ import 'barcode_scan_screen.dart';
 import 'food_detail_screen.dart';
 import 'food_search_screen.dart';
 import 'goals_screen.dart';
+import 'recipe_editor_screen.dart';
 
 /// Today tab: calories and macros vs. goals, and the four meals.
 /// The arrows switch days so past days can be checked or filled in.
@@ -51,6 +53,28 @@ class _TodayScreenState extends State<TodayScreen> {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => BarcodeScanScreen(meal: meal, day: _day),
+      ),
+    );
+  }
+
+  /// Saves everything in a meal (e.g. her usual breakfast) to My meals.
+  Future<void> _saveAsMeal(Meal meal) async {
+    final entries = FoodLogRepository.instance.entriesFor(_day, meal);
+    if (entries.isEmpty) return;
+    final recipe = Recipe.draft(
+      name: entries.length == 1 ? entries.first.food.name : 'My ${meal.label.toLowerCase()}',
+      components: [
+        for (final e in entries)
+          RecipeComponent(
+            food: e.food,
+            serving: e.serving,
+            quantity: e.quantity,
+          ),
+      ],
+    );
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => RecipeEditorScreen(recipe: recipe, isNew: true),
       ),
     );
   }
@@ -131,6 +155,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   entries: log.entriesFor(_day, meal),
                   onAdd: () => _addFood(meal),
                   onScan: () => _scanFood(meal),
+                  onSaveAsMeal: () => _saveAsMeal(meal),
                   onOpen: _openEntry,
                 ),
             ],

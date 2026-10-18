@@ -3,13 +3,17 @@ import 'package:flutter/material.dart';
 import '../models/food.dart';
 import '../models/log_entry.dart';
 import '../models/meal.dart';
+import '../models/recipe.dart';
 import '../services/food_log_repository.dart';
+import '../services/saved_meals.dart';
 import '../utils/dates.dart';
 import '../utils/units.dart';
 import '../widgets/daily_progress_card.dart';
+import 'recipe_editor_screen.dart';
 
 /// Pick serving, amount and meal for a food, then add it to the log.
-/// Also used to edit (or delete) an entry that's already logged.
+/// Also used to edit (or delete) an entry that's already logged, and to
+/// choose an amount for a meal ingredient ([FoodDetailScreen.pick]).
 class FoodDetailScreen extends StatefulWidget {
   const FoodDetailScreen.add({
     super.key,
@@ -18,14 +22,27 @@ class FoodDetailScreen extends StatefulWidget {
     required DateTime this.day,
     this.initialServing,
     this.initialQuantity,
-  }) : entry = null;
+  })  : entry = null,
+        pickLabel = null;
+
+  /// Choose serving and amount only; pops with a [PickedFood].
+  const FoodDetailScreen.pick({
+    super.key,
+    required FoodItem this.food,
+    required String this.pickLabel,
+    this.initialServing,
+    this.initialQuantity,
+  })  : entry = null,
+        meal = null,
+        day = null;
 
   const FoodDetailScreen.edit({super.key, required LogEntry this.entry})
       : food = null,
         meal = null,
         day = null,
         initialServing = null,
-        initialQuantity = null;
+        initialQuantity = null,
+        pickLabel = null;
 
   final FoodItem? food;
   final Meal? meal;
@@ -33,6 +50,7 @@ class FoodDetailScreen extends StatefulWidget {
   final Serving? initialServing;
   final double? initialQuantity;
   final LogEntry? entry;
+  final String? pickLabel;
 
   @override
   State<FoodDetailScreen> createState() => _FoodDetailScreenState();
@@ -46,14 +64,15 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
   final _quantity = TextEditingController();
 
   bool get _editing => widget.entry != null;
+  bool get _picking => widget.pickLabel != null;
 
   @override
   void initState() {
     super.initState();
     final e = widget.entry;
     _food = e?.food ?? widget.food!;
-    _meal = e?.meal ?? widget.meal!;
-    _day = e?.day ?? widget.day!;
+    _meal = e?.meal ?? widget.meal ?? Meal.snacks;
+    _day = e?.day ?? widget.day ?? DateTime.now();
 
     final wanted = e?.serving ?? widget.initialServing;
     _serving = (wanted != null && _food.servings.contains(wanted))
@@ -124,6 +143,10 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       );
       return;
     }
+    if (_picking) {
+      Navigator.of(context).pop(PickedFood(_food, _serving, q));
+      return;
+    }
     final repo = FoodLogRepository.instance;
     if (_editing) {
       await repo.save(widget.entry!.copyWith(
@@ -141,6 +164,41 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
       );
     }
     if (mounted) Navigator.of(context).pop(true);
+  }
+
+  Future<void> _toggleFavorite() async {
+    final nowFavorite = await FavoritesRepository.instance
+        .toggle(_food, _serving, _qty ?? 1);
+    if (!mounted) return;
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(nowFavorite ? 'Added to favorites' : 'Removed from favorites'),
+    ));
+  }
+
+  /// Turn this food into a meal she can add to or take things out of
+  /// (e.g. a burger with no cheese and extra sauce).
+  Future<void> _customize() async {
+    final existing = RecipeRepository.instance.forFood(_food);
+    final recipe = existing ??
+        Recipe.draft(
+          name: '${_food.name} (my way)',
+          components: [
+            RecipeComponent(
+              food: _food,
+              serving: _serving,
+              quantity: _qty ?? 1,
+            ),
+          ],
+        );
+    final logged = await Navigator.of(context).push<bool>(MaterialPageRoute(
+      builder: (_) => RecipeEditorScreen(
+        recipe: recipe,
+        isNew: existing == null,
+        logTo: (_meal, _day),
+      ),
+    ));
+    if (logged == true && mounted) Navigator.of(context).pop(true);
   }
 
   Future<void> _delete() async {
@@ -167,8 +225,23 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_editing ? 'Edit food' : 'Add food'),
+        title: Text(_picking
+            ? 'Ingredient'
+            : (_editing ? 'Edit food' : 'Add food')),
         actions: [
+          if (!_picking)
+            ListenableBuilder(
+              listenable: FavoritesRepository.instance,
+              builder: (context, _) {
+                final fav = FavoritesRepository.instance.isFavorite(_food.id);
+                return IconButton(
+                  tooltip: fav ? 'Remove from favorites' : 'Add to favorites',
+                  icon: Icon(fav ? Icons.star : Icons.star_border),
+                  color: fav ? Colors.amber : null,
+                  onPressed: _toggleFavorite,
+                );
+              },
+            ),
           if (_editing)
             IconButton(
               tooltip: 'Delete',
@@ -260,6 +333,7 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             ),
             const SizedBox(height: 20),
 
+            if (!_picking) ...[
             // Meal
             Text('Meal', style: text.titleSmall),
             const SizedBox(height: 8),
@@ -278,14 +352,30 @@ class _FoodDetailScreenState extends State<FoodDetailScreen> {
             ),
             const SizedBox(height: 8),
             Text(friendlyDay(_day), style: text.bodySmall),
+            ],
             const SizedBox(height: 24),
             FilledButton(
               onPressed: _save,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                child: Text(_editing ? 'Save changes' : 'Add to ${_meal.label}'),
+                child: Text(_picking
+                    ? widget.pickLabel!
+                    : (_editing ? 'Save changes' : 'Add to ${_meal.label}')),
               ),
             ),
+            if (!_picking && !_editing) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _customize,
+                icon: const Icon(Icons.tune),
+                label: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(_food.source == FoodSource.recipe
+                      ? 'Edit this meal'
+                      : 'Customize (add or remove ingredients)'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

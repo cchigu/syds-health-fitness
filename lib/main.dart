@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'services/custom_food_repository.dart';
 import 'services/food_log_repository.dart';
 import 'services/profile_repository.dart';
+import 'services/saved_meals.dart';
 import 'screens/love_splash_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/progress_screen.dart';
@@ -19,6 +20,8 @@ Future<void> main() async {
   await ProfileRepository.instance.init();
   await FoodLogRepository.instance.init();
   await CustomFoodRepository.instance.init();
+  await FavoritesRepository.instance.init();
+  await RecipeRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 
