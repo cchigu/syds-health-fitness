@@ -149,4 +149,84 @@ void main() {
       expect(WorkoutPrefs.fromMap(p.toMap())!.intensity, -1);
     });
   });
+
+  group('her own edits', () {
+    final base = _prefs(days: {1, 3, 5}, minutes: 45);
+
+    test('her numbers replace the plan\'s for that exercise', () {
+      final p = base.copyWith(overrides: {
+        'fullA:goblet_squat':
+            const ExerciseOverride(prescription: '4 × 6', weightLb: 25),
+      });
+      final w = WorkoutPlanner.build(SessionType.fullA, p, Units.imperial);
+      final squat = _all(w).firstWhere((e) => e.exercise.id == 'goblet_squat');
+      expect(squat.prescription, '4 × 6');
+      expect(squat.weight, '25 lb');
+      expect(squat.custom, isTrue);
+    });
+
+    test('removed exercises disappear; added ones appear', () {
+      final p = base.copyWith(
+        removed: {'fullA:goblet_squat'},
+        extras: {
+          'fullA': [
+            const ExtraExercise(exerciseId: 'mine_1', prescription: '3 × 15'),
+          ],
+        },
+        customExercises: [
+          const CustomExerciseDef(id: 'mine_1', name: 'Donkey kicks'),
+        ],
+      );
+      final w = WorkoutPlanner.build(SessionType.fullA, p, Units.imperial);
+      final names = _all(w).map((e) => e.exercise.name).toList();
+      expect(names, isNot(contains('Goblet squat')));
+      expect(names, contains('Donkey kicks'));
+    });
+
+    test('her edits stay in the saved plan', () {
+      final p = base.copyWith(
+        overrides: {'x:y': const ExerciseOverride(prescription: '2 × 5')},
+        removed: {'a:b'},
+        customExercises: [const CustomExerciseDef(id: 'mine_2', name: 'Z')],
+      );
+      final back = WorkoutPrefs.fromMap(p.toMap())!;
+      expect(back.overrides['x:y']!.prescription, '2 × 5');
+      expect(back.removed, {'a:b'});
+      expect(back.customExercises.single.name, 'Z');
+    });
+  });
+
+  group('one-week moves', () {
+    final monday = DateTime(2026, 10, 19);
+    final p = _prefs(days: {1, 3, 5});
+
+    test('moving Wednesday to Thursday only changes this week', () {
+      final wed = DateTime(2026, 10, 21);
+      final thu = DateTime(2026, 10, 22);
+      final week = WorkoutPlanner.weekSchedule(p, Units.imperial, monday,
+          changeFor: (d) => d == wed
+              ? ScheduleChange(
+                  originalDay: wed, newDay: thu, updatedAt: DateTime(2026))
+              : null);
+      expect(week.on(wed), isNull);
+      expect(week.on(thu)?.moved, isTrue);
+      expect(week.scheduled, hasLength(3));
+
+      // Next week has no changes: back to normal.
+      final next = WorkoutPlanner.weekSchedule(
+          p, Units.imperial, monday.add(const Duration(days: 7)),
+          changeFor: (_) => null);
+      expect(next.on(wed.add(const Duration(days: 7))), isNotNull);
+    });
+
+    test('skipping takes it off this week', () {
+      final fri = DateTime(2026, 10, 23);
+      final week = WorkoutPlanner.weekSchedule(p, Units.imperial, monday,
+          changeFor: (d) => d == fri
+              ? ScheduleChange(originalDay: fri, updatedAt: DateTime(2026))
+              : null);
+      expect(week.scheduled, hasLength(2));
+      expect(week.skipped.single.originalDay, fri);
+    });
+  });
 }

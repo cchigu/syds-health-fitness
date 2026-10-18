@@ -3,6 +3,7 @@ import 'dart:math';
 import '../data/exercise_library.dart';
 import '../models/user_profile.dart';
 import '../models/workout.dart';
+import '../utils/dates.dart';
 import '../utils/units.dart';
 
 enum SessionType {
@@ -170,8 +171,52 @@ class WorkoutPlanner {
     };
   }
 
+  /// The actual dates for the week starting [monday], after one-week moves
+  /// and skips.
+  static WeekSchedule weekSchedule(
+    WorkoutPrefs p,
+    Units units,
+    DateTime monday, {
+    required ScheduleChange? Function(DateTime originalDay) changeFor,
+  }) {
+    final scheduled = <ScheduledWorkout>[];
+    final skipped = <ScheduledWorkout>[];
+    weekPlan(p, units).forEach((weekday, workout) {
+      final original = dayOnly(monday.add(Duration(days: weekday - 1)));
+      final change = changeFor(original);
+      final s = ScheduledWorkout(
+        day: change?.newDay ?? original,
+        originalDay: original,
+        workout: workout,
+      );
+      if (change != null && change.skipped) {
+        skipped.add(s);
+      } else {
+        scheduled.add(s);
+      }
+    });
+    scheduled.sort((a, b) => a.day.compareTo(b.day));
+    skipped.sort((a, b) => a.originalDay.compareTo(b.originalDay));
+    return WeekSchedule(scheduled, skipped);
+  }
+
+  /// Any exercise: from the library or one she made up.
+  static Exercise? exerciseById(WorkoutPrefs p, String id) {
+    final lib = ExerciseLibrary.all[id];
+    if (lib != null) return lib;
+    for (final c in p.customExercises) {
+      if (c.id == id) return c.toExercise();
+    }
+    return null;
+  }
+
+  static String formatWeight(double lb, Units units) => units == Units.imperial
+      ? '${trimNumber(lb)} lb'
+      : '${trimNumber(lbToKg(lb))} kg';
+
   /// A gentle 10-minute stretch for rest days.
   static PlannedWorkout restDayStretch(WorkoutPrefs p) => PlannedWorkout(
+        sessionKey: 'restDay',
         title: 'Rest day stretch',
         subtitle: 'Optional · about 10 minutes',
         minutes: 10,
@@ -183,6 +228,18 @@ class WorkoutPlanner {
           ),
         ],
       );
+
+  /// Rest-day stretch with her edits applied.
+  static PlannedWorkout restDay(WorkoutPrefs p, Units units) {
+    final base = restDayStretch(p);
+    return PlannedWorkout(
+      sessionKey: base.sessionKey,
+      title: base.title,
+      subtitle: base.subtitle,
+      minutes: base.minutes,
+      sections: _applyEdits('restDay', base.sections, p, units),
+    );
+  }
 
   static PlannedWorkout build(SessionType type, WorkoutPrefs p, Units units) {
     final m = p.minutes;
@@ -256,12 +313,73 @@ class WorkoutPlanner {
     ));
 
     return PlannedWorkout(
+      sessionKey: type.name,
       title: titleOf(type),
       subtitle: i == 0
           ? '$m min · ${p.focus.label}'
           : '$m min · ${p.focus.label} · ${Intensity.label(i)}',
       minutes: m,
-      sections: sections,
+      sections: _applyEdits(type.name, sections, p, units),
+    );
+  }
+
+  /// Her own changes: removed exercises, her numbers, and added exercises.
+  static List<WorkoutSection> _applyEdits(String session,
+      List<WorkoutSection> sections, WorkoutPrefs p, Units units) {
+    final edited = <WorkoutSection>[
+      for (final s in sections)
+        WorkoutSection(
+          s.title,
+          [
+            for (final pe in s.exercises)
+              if (!p.removed.contains('$session:${pe.exercise.id}'))
+                _withOverride(pe, p.overrides['$session:${pe.exercise.id}'],
+                    units),
+          ],
+          note: s.note,
+        ),
+    ];
+
+    final extras = p.extras[session] ?? const [];
+    if (extras.isEmpty) return edited;
+    final added = <PlannedExercise>[
+      for (var i = 0; i < extras.length; i++)
+        if (exerciseById(p, extras[i].exerciseId) case final e?)
+          PlannedExercise(
+            exercise: e,
+            prescription: extras[i].prescription,
+            weight: extras[i].weightLb == null
+                ? null
+                : formatWeight(extras[i].weightLb!, units),
+            custom: true,
+            extraIndex: i,
+          ),
+    ];
+    final main = edited.indexWhere(
+        (s) => s.title == 'Strength' || s.title == 'Core');
+    if (main >= 0) {
+      final s = edited[main];
+      edited[main] =
+          WorkoutSection(s.title, [...s.exercises, ...added], note: s.note);
+    } else {
+      // Rest-day stretch or walk days: put them before the cool-down.
+      final at = max(0, edited.length - 1);
+      edited.insert(at, WorkoutSection('My exercises', added));
+    }
+    return edited;
+  }
+
+  static PlannedExercise _withOverride(
+      PlannedExercise pe, ExerciseOverride? o, Units units) {
+    if (o == null) return pe;
+    return PlannedExercise(
+      exercise: pe.exercise,
+      prescription: o.prescription,
+      weight: o.weightLb == null ? pe.weight : formatWeight(o.weightLb!, units),
+      rest: pe.rest,
+      slotKey: pe.slotKey,
+      alternatives: pe.alternatives,
+      custom: true,
     );
   }
 

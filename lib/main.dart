@@ -27,6 +27,7 @@ Future<void> main() async {
   await WeightRepository.instance.init();
   await WorkoutPrefsRepository.instance.init();
   await WorkoutLogRepository.instance.init();
+  await WorkoutScheduleRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 

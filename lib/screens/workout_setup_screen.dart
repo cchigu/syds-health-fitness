@@ -72,6 +72,11 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
           ? old.swaps
           : const {},
       intensity: old?.intensity ?? 0,
+      // Her own exercise edits stay when she changes her answers.
+      overrides: old?.overrides ?? const {},
+      removed: old?.removed ?? const {},
+      extras: old?.extras ?? const {},
+      customExercises: old?.customExercises ?? const [],
       updatedAt: DateTime.now(),
     ));
     if (mounted) Navigator.of(context).pop(true);

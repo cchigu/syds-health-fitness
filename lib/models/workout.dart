@@ -122,11 +122,28 @@ class WorkoutPrefs implements Syncable {
     required this.updatedAt,
     this.swaps = const {},
     this.intensity = 0,
+    this.overrides = const {},
+    this.removed = const {},
+    this.extras = const {},
+    this.customExercises = const [],
     this.deleted = false,
   });
 
   /// -2 (easiest) to +2 (hardest); 0 = the plan as built.
   final int intensity;
+
+  /// Her own sets/reps/weight for an exercise in a workout.
+  /// Key: "<workout>:<exerciseId>", e.g. "lowerA:goblet_squat".
+  final Map<String, ExerciseOverride> overrides;
+
+  /// Exercises she took out of a workout (same keys as [overrides]).
+  final Set<String> removed;
+
+  /// Exercises she added, by workout (e.g. "lowerA").
+  final Map<String, List<ExtraExercise>> extras;
+
+  /// Exercises she made up herself.
+  final List<CustomExerciseDef> customExercises;
 
   /// 1 = Monday ... 7 = Sunday.
   final Set<int> weekdays;
@@ -148,6 +165,10 @@ class WorkoutPrefs implements Syncable {
   WorkoutPrefs copyWith({
     Map<String, String>? swaps,
     int? intensity,
+    Map<String, ExerciseOverride>? overrides,
+    Set<String>? removed,
+    Map<String, List<ExtraExercise>>? extras,
+    List<CustomExerciseDef>? customExercises,
     DateTime? updatedAt,
   }) =>
       WorkoutPrefs(
@@ -158,6 +179,10 @@ class WorkoutPrefs implements Syncable {
         avoid: avoid,
         swaps: swaps ?? this.swaps,
         intensity: intensity ?? this.intensity,
+        overrides: overrides ?? this.overrides,
+        removed: removed ?? this.removed,
+        extras: extras ?? this.extras,
+        customExercises: customExercises ?? this.customExercises,
         updatedAt: updatedAt ?? this.updatedAt,
       );
 
@@ -170,6 +195,15 @@ class WorkoutPrefs implements Syncable {
         'avoid': [for (final a in avoid) a.name],
         'swaps': swaps,
         'intensity': intensity,
+        'overrides': {
+          for (final e in overrides.entries) e.key: e.value.toMap(),
+        },
+        'removed': removed.toList(),
+        'extras': {
+          for (final e in extras.entries)
+            e.key: [for (final x in e.value) x.toMap()],
+        },
+        'customExercises': [for (final c in customExercises) c.toMap()],
         'updatedAt': updatedAt.millisecondsSinceEpoch,
         'deleted': deleted,
       };
@@ -199,6 +233,28 @@ class WorkoutPrefs implements Syncable {
       },
       intensity: ((m['intensity'] as num?)?.toInt() ?? 0)
           .clamp(Intensity.min, Intensity.max),
+      overrides: {
+        for (final e in ((m['overrides'] as Map?) ?? const {}).entries)
+          if (e.value is Map)
+            '${e.key}': ExerciseOverride.fromMap(
+                Map<String, dynamic>.from(e.value as Map)),
+      },
+      removed: {
+        for (final r in (m['removed'] as List?) ?? const []) '$r',
+      },
+      extras: {
+        for (final e in ((m['extras'] as Map?) ?? const {}).entries)
+          if (e.value is List)
+            '${e.key}': [
+              for (final x in e.value as List)
+                if (x is Map)
+                  ExtraExercise.fromMap(Map<String, dynamic>.from(x)),
+            ],
+      },
+      customExercises: [
+        for (final c in (m['customExercises'] as List?) ?? const [])
+          if (c is Map) CustomExerciseDef.fromMap(Map<String, dynamic>.from(c)),
+      ],
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
           (m['updatedAt'] as num?)?.toInt() ?? 0),
       deleted: m['deleted'] == true,
@@ -259,9 +315,17 @@ class PlannedExercise {
     this.rest,
     this.slotKey,
     this.alternatives = const [],
+    this.custom = false,
+    this.extraIndex,
   });
 
   final Exercise exercise;
+
+  /// True when she set her own numbers for it.
+  final bool custom;
+
+  /// Set when she added this exercise herself (its place in her extras).
+  final int? extraIndex;
 
   /// e.g. "3 × 10–12" or "Hold 30 s each side" or "10 min: …".
   final String prescription;
@@ -290,10 +354,161 @@ class PlannedWorkout {
     required this.subtitle,
     required this.minutes,
     required this.sections,
+    this.sessionKey,
   });
 
+  /// Which workout this is (e.g. "lowerA"); used to save her edits.
+  final String? sessionKey;
   final String title;
   final String subtitle;
   final int minutes;
   final List<WorkoutSection> sections;
+}
+
+/// Her own numbers for an exercise.
+class ExerciseOverride {
+  const ExerciseOverride({required this.prescription, this.weightLb});
+
+  /// e.g. "3 × 12" or "15 min".
+  final String prescription;
+  final double? weightLb;
+
+  Map<String, dynamic> toMap() =>
+      {'prescription': prescription, 'weightLb': weightLb};
+
+  static ExerciseOverride fromMap(Map<String, dynamic> m) => ExerciseOverride(
+        prescription: (m['prescription'] as String?) ?? '',
+        weightLb: (m['weightLb'] as num?)?.toDouble(),
+      );
+}
+
+/// An exercise she added to a workout.
+class ExtraExercise {
+  const ExtraExercise({
+    required this.exerciseId,
+    required this.prescription,
+    this.weightLb,
+  });
+
+  final String exerciseId;
+  final String prescription;
+  final double? weightLb;
+
+  Map<String, dynamic> toMap() => {
+        'exerciseId': exerciseId,
+        'prescription': prescription,
+        'weightLb': weightLb,
+      };
+
+  static ExtraExercise fromMap(Map<String, dynamic> m) => ExtraExercise(
+        exerciseId: (m['exerciseId'] as String?) ?? '',
+        prescription: (m['prescription'] as String?) ?? '',
+        weightLb: (m['weightLb'] as num?)?.toDouble(),
+      );
+}
+
+/// An exercise she made up (name and her own notes).
+class CustomExerciseDef {
+  const CustomExerciseDef({
+    required this.id,
+    required this.name,
+    this.notes = '',
+  });
+
+  final String id;
+  final String name;
+  final String notes;
+
+  Exercise toExercise() => Exercise(
+        id: id,
+        name: name,
+        kind: ExerciseKind.strength,
+        equipment: 'My exercise',
+        steps: notes.trim().isEmpty
+            ? const ['One of your own exercises.']
+            : notes.trim().split('\n'),
+      );
+
+  Map<String, dynamic> toMap() => {'id': id, 'name': name, 'notes': notes};
+
+  static CustomExerciseDef fromMap(Map<String, dynamic> m) => CustomExerciseDef(
+        id: (m['id'] as String?) ?? '',
+        name: (m['name'] as String?) ?? 'My exercise',
+        notes: (m['notes'] as String?) ?? '',
+      );
+}
+
+/// A one-week change: a workout moved to another day, or skipped.
+class ScheduleChange implements Syncable {
+  const ScheduleChange({
+    required this.originalDay,
+    required this.updatedAt,
+    this.newDay,
+    this.deleted = false,
+  });
+
+  /// The day it was planned for.
+  final DateTime originalDay;
+
+  /// Where it moved to; null means skipped this week.
+  final DateTime? newDay;
+  @override
+  final DateTime updatedAt;
+  @override
+  final bool deleted;
+
+  bool get skipped => newDay == null;
+
+  @override
+  String get id => dayKey(originalDay);
+
+  @override
+  Map<String, dynamic> toMap() => {
+        'originalDay': dayKey(originalDay),
+        'newDay': newDay == null ? null : dayKey(newDay!),
+        'updatedAt': updatedAt.millisecondsSinceEpoch,
+        'deleted': deleted,
+      };
+
+  static ScheduleChange? fromMap(Map<String, dynamic> m) {
+    final original = parseDayKey(m['originalDay'] as String?);
+    if (original == null) return null;
+    return ScheduleChange(
+      originalDay: original,
+      newDay: parseDayKey(m['newDay'] as String?),
+      updatedAt: DateTime.fromMillisecondsSinceEpoch(
+          (m['updatedAt'] as num?)?.toInt() ?? 0),
+      deleted: m['deleted'] == true,
+    );
+  }
+}
+
+/// A workout placed on an actual date this week.
+class ScheduledWorkout {
+  const ScheduledWorkout({
+    required this.day,
+    required this.originalDay,
+    required this.workout,
+  });
+
+  final DateTime day;
+  final DateTime originalDay;
+  final PlannedWorkout workout;
+
+  bool get moved => !isSameDay(day, originalDay);
+}
+
+class WeekSchedule {
+  const WeekSchedule(this.scheduled, this.skipped);
+
+  /// Sorted by day.
+  final List<ScheduledWorkout> scheduled;
+  final List<ScheduledWorkout> skipped;
+
+  ScheduledWorkout? on(DateTime day) {
+    for (final s in scheduled) {
+      if (isSameDay(s.day, day)) return s;
+    }
+    return null;
+  }
 }
