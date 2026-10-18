@@ -167,7 +167,7 @@ class WorkoutPlanner {
     final split = splitFor(days.length);
     return {
       for (var i = 0; i < days.length; i++)
-        days[i]: build(split[i], p, units),
+        days[i]: build(split[i], p, units, minutes: p.minutesFor(days[i])),
     };
   }
 
@@ -232,60 +232,160 @@ class WorkoutPlanner {
   /// Rest-day stretch with her edits applied.
   static PlannedWorkout restDay(WorkoutPrefs p, Units units) {
     final base = restDayStretch(p);
-    return PlannedWorkout(
+    return _finish(PlannedWorkout(
       sessionKey: base.sessionKey,
       title: base.title,
-      subtitle: base.subtitle,
+      subtitle: '',
       minutes: base.minutes,
       sections: _applyEdits('restDay', base.sections, p, units),
+    ), p, subtitle: (m) => 'Optional · about $m min');
+  }
+
+  /// Minutes per set, including rest (or time paired with another move).
+  static double _perSet(WorkoutPrefs p) => switch (p.focus) {
+        WorkoutFocus.strength => 1.4,
+        WorkoutFocus.both => 1.0,
+        WorkoutFocus.fatLoss => 0.9,
+      };
+
+  static int _setAdj(WorkoutPrefs p) {
+    final i = p.intensity;
+    return switch (p.experience) {
+          Experience.beginner => -1,
+          Experience.intermediate => 0,
+          Experience.advanced => 1,
+        } +
+        (i > 0 ? 1 : (i < 0 ? -1 : 0)) +
+        (i.abs() >= 2 ? i.sign : 0);
+  }
+
+  static int _strengthSets(WorkoutPrefs p) => (3 + _setAdj(p)).clamp(2, 5);
+  static int _coreSets(WorkoutPrefs p) => (3 + min(_setAdj(p), 1)).clamp(2, 4);
+
+  /// How long an exercise takes, read from what it says to do.
+  static double estimateMinutes(Exercise e, String prescription, WorkoutPrefs p) {
+    double? first(String pattern) {
+      final m = RegExp(pattern).firstMatch(prescription);
+      return m == null ? null : double.tryParse(m.group(1)!);
+    }
+
+    switch (e.kind) {
+      case ExerciseKind.warmup:
+      case ExerciseKind.cardio:
+        return first(r'(\d+(?:\.\d+)?)\s*min') ?? first(r'(\d+)') ?? 5;
+      case ExerciseKind.stretch:
+        final secs = first(r'(\d+)\s*s') ?? 30;
+        final sides = prescription.contains('each side') ? 2 : 1;
+        return secs * sides / 60 + 0.25;
+      case ExerciseKind.strength:
+      case ExerciseKind.core:
+        final sets = first(r'^\s*(\d+)\s*×') ?? 3;
+        return sets * (e.kind == ExerciseKind.core ? 0.75 : _perSet(p));
+    }
+  }
+
+  /// Adds time estimates to every exercise and sets the total + subtitle.
+  static PlannedWorkout _finish(PlannedWorkout w, WorkoutPrefs p,
+      {required String Function(int minutes) subtitle}) {
+    final sections = [
+      for (final s in w.sections)
+        WorkoutSection(
+          s.title,
+          [
+            for (final pe in s.exercises)
+              pe.withMinutes(estimateMinutes(pe.exercise, pe.prescription, p)),
+          ],
+          note: s.note,
+        ),
+    ];
+    final draft = PlannedWorkout(
+      sessionKey: w.sessionKey,
+      title: w.title,
+      subtitle: w.subtitle,
+      minutes: w.minutes,
+      sections: sections,
+    );
+    final total = draft.breakdown.total;
+    return PlannedWorkout(
+      sessionKey: w.sessionKey,
+      title: w.title,
+      subtitle: subtitle(total),
+      minutes: total,
+      sections: sections,
     );
   }
 
-  static PlannedWorkout build(SessionType type, WorkoutPrefs p, Units units) {
-    final m = p.minutes;
+  /// Builds one workout to fit [minutes] (her length for that day).
+  ///
+  /// The time is budgeted: warm-up and stretches first, then a treadmill
+  /// share that depends on her goal, and the rest goes to strength —
+  /// as many exercises as fit at her number of sets.
+  static PlannedWorkout build(SessionType type, WorkoutPrefs p, Units units,
+      {int? minutes}) {
+    final m = minutes ?? p.minutes;
+    final i = p.intensity;
     final isCardioDay = type == SessionType.cardioCore ||
         type == SessionType.cardioCore2;
     final isMobility = type == SessionType.mobility;
 
-    // How the time is split up.
-    final (strengthCount, cardioMin) = isMobility
-        ? (0, max(15, m - 15))
-        : isCardioDay
-            ? (m >= 45 ? 4 : 3, max(10, m - 15))
-            : switch (p.focus) {
-                WorkoutFocus.fatLoss => m <= 20
-                    ? (3, 6)
-                    : (m <= 30 ? (4, 10) : (6, 15)),
-                WorkoutFocus.both => m <= 20
-                    ? (3, 5)
-                    : (m <= 30 ? (5, 8) : (6, 12)),
-                WorkoutFocus.strength => m <= 20
-                    ? (4, 0)
-                    : (m <= 30 ? (5, 0) : (7, 5)),
-              };
+    final warm = m <= 15 ? 3 : 5;
+    final stretchList = _stretches(type, p,
+        count: isMobility
+            ? 8
+            : (m <= 20 ? 3 : (m <= 30 ? 4 : (m <= 45 ? 5 : 6))));
+    final stretchMin = stretchList.fold<double>(
+        0, (t, pe) => t + estimateMinutes(pe.exercise, pe.prescription, p));
+    final left = m - warm - stretchMin;
 
-    // Intensity adds or removes ~2 treadmill minutes per level; at the top
-    // level even strength days get a short finisher.
-    final i = p.intensity;
-    final cardio = cardioMin == 0
-        ? (i >= 2 ? 5 : 0)
-        : max(isMobility ? 10 : 4, cardioMin + 2 * i);
+    var strengthCount = 0;
+    var perExercise = 0.0;
+    var strengthBudget = 0.0;
+    int cardio;
+    if (isMobility) {
+      cardio = max(5, left.round());
+    } else if (isCardioDay) {
+      strengthCount = m >= 45 ? 4 : 3;
+      perExercise = _coreSets(p) * 0.75;
+      strengthBudget = strengthCount * perExercise;
+      cardio = max(5, (left - strengthBudget).round());
+    } else {
+      final share = switch (p.focus) {
+        WorkoutFocus.fatLoss => 0.45,
+        WorkoutFocus.both => 0.30,
+        WorkoutFocus.strength => m >= 45 ? 0.12 : 0.0,
+      };
+      cardio = (left * share).round();
+      if (cardio > 0) cardio += 2 * i; // intensity: ~2 min per level
+      if (cardio == 0 && i >= 2 && m >= 20) cardio = 5;
+      if (cardio < 4) cardio = p.focus == WorkoutFocus.fatLoss ? 4 : 0;
+
+      perExercise = _strengthSets(p) * _perSet(p);
+      strengthBudget = max(0.0, left - cardio);
+      strengthCount = (strengthBudget / perExercise).floor().clamp(2, 7);
+    }
+
+    // Build the exercises first: if fewer fit than planned (e.g. some were
+    // left out to protect an area), the spare time goes to the treadmill.
+    final main = strengthCount > 0
+        ? _mainBlock(type, p, units, strengthCount)
+        : const <PlannedExercise>[];
+    final spare = strengthBudget - main.length * perExercise;
+    if (spare >= 2) cardio += spare.floor();
 
     final sections = <WorkoutSection>[
       WorkoutSection('Warm-up', [
         PlannedExercise(
           exercise: ExerciseLibrary.byId('warmup_walk'),
-          prescription: '5 min',
+          prescription: '${warm - 1} min',
         ),
         PlannedExercise(
           exercise: ExerciseLibrary.byId('arm_circles_leg_swings'),
-          prescription: '1–2 min',
+          prescription: '1 min',
         ),
       ]),
     ];
 
-    if (strengthCount > 0) {
-      final main = _mainBlock(type, p, units, strengthCount);
+    if (main.isNotEmpty) {
       sections.add(WorkoutSection(
         isCardioDay ? 'Core' : 'Strength',
         main,
@@ -308,18 +408,22 @@ class WorkoutPlanner {
 
     sections.add(WorkoutSection(
       'Cool-down stretches',
-      _stretches(type, p, count: isMobility ? 8 : (m <= 20 ? 3 : 4)),
+      stretchList,
       note: 'Hold each stretch gently — no bouncing.',
     ));
 
-    return PlannedWorkout(
-      sessionKey: type.name,
-      title: titleOf(type),
-      subtitle: i == 0
-          ? '$m min · ${p.focus.label}'
-          : '$m min · ${p.focus.label} · ${Intensity.label(i)}',
-      minutes: m,
-      sections: _applyEdits(type.name, sections, p, units),
+    return _finish(
+      PlannedWorkout(
+        sessionKey: type.name,
+        title: titleOf(type),
+        subtitle: '',
+        minutes: m,
+        sections: _applyEdits(type.name, sections, p, units),
+      ),
+      p,
+      subtitle: (total) => i == 0
+          ? '$total min · ${p.focus.label}'
+          : '$total min · ${p.focus.label} · ${Intensity.label(i)}',
     );
   }
 
@@ -413,16 +517,9 @@ class WorkoutPlanner {
       {String? slotKey, List<Exercise> alternatives = const []}) {
     final each = e.perSide ? ' each side' : '';
     final i = p.intensity;
-    final setAdj = switch (p.experience) {
-          Experience.beginner => -1,
-          Experience.intermediate => 0,
-          Experience.advanced => 1,
-        } +
-        (i > 0 ? 1 : (i < 0 ? -1 : 0)) +
-        (i.abs() >= 2 ? i.sign : 0);
 
     if (e.kind == ExerciseKind.core) {
-      final sets = (3 + min(setAdj, 1)).clamp(2, 4);
+      final sets = _coreSets(p);
       // Experience picks the starting point; intensity moves it up or down.
       final level = (p.experience.index + 1 + i).clamp(0, 4);
       final dose = e.timeBased
@@ -441,7 +538,7 @@ class WorkoutPlanner {
       WorkoutFocus.both => (3, '10–12'),
       WorkoutFocus.fatLoss => (3, '12–15'),
     };
-    final sets = (baseSets + setAdj).clamp(2, 5);
+    final sets = (baseSets - 3 + _strengthSets(p)).clamp(2, 5);
 
     String? weight;
     final range = e.weightLb;

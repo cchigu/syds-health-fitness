@@ -28,7 +28,7 @@ void main() {
     for (final type in SessionType.values) {
       for (final focus in WorkoutFocus.values) {
         for (final exp in Experience.values) {
-          for (final m in [20, 30, 45]) {
+          for (final m in [15, 20, 30, 45, 60]) {
             for (final avoid in [
               <BodyArea>{},
               {BodyArea.knees},
@@ -227,6 +227,39 @@ void main() {
               : null);
       expect(week.scheduled, hasLength(2));
       expect(week.skipped.single.originalDay, fri);
+    });
+  });
+
+  group('time', () {
+    test('each workout fits the length she picked for that day', () {
+      for (final focus in WorkoutFocus.values) {
+        for (final m in [15, 20, 30, 45, 60]) {
+          for (final type in [SessionType.fullA, SessionType.lowerA,
+              SessionType.cardioCore]) {
+            final w = WorkoutPlanner.build(
+                type, _prefs(focus: focus), Units.imperial, minutes: m);
+            expect(w.breakdown.total, inInclusiveRange(m - 4, m + 2),
+                reason: '$type $focus $m');
+          }
+        }
+      }
+    });
+
+    test('different days can have different lengths', () {
+      final p = _prefs(days: {1, 3}).copyWith(minutesByDay: {1: 20, 3: 45});
+      final plan = WorkoutPlanner.weekPlan(p, Units.imperial);
+      expect(plan[1]!.minutes, lessThan(plan[3]!.minutes));
+      expect(WorkoutPrefs.fromMap(p.toMap())!.minutesFor(3), 45);
+    });
+
+    test('breakdown adds up and splits by type', () {
+      final w = WorkoutPlanner.build(SessionType.fullA,
+          _prefs(focus: WorkoutFocus.both), Units.imperial, minutes: 30);
+      final b = w.breakdown;
+      expect(b.strength, greaterThan(0));
+      expect(b.treadmill, greaterThan(0));
+      expect(b.stretching, greaterThan(0));
+      expect(b.total, w.minutes);
     });
   });
 }

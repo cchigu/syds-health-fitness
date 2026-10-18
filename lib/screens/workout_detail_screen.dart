@@ -7,6 +7,7 @@ import '../services/profile_repository.dart';
 import '../services/workout_repository.dart';
 import '../utils/dates.dart';
 import '../utils/units.dart';
+import '../widgets/time_breakdown.dart';
 
 /// One workout: warm-up, exercises, treadmill and stretches.
 ///
@@ -419,9 +420,23 @@ class _WorkoutDetailScreenState extends State<WorkoutDetailScreen> {
                 style: text.bodyMedium?.copyWith(color: colors.outline),
               ),
             ),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('About ${w.breakdown.total} minutes',
+                        style: text.titleMedium),
+                    const SizedBox(height: 10),
+                    TimeBreakdown(breakdown: w.breakdown),
+                  ],
+                ),
+              ),
+            ),
             if (_total > 0)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8),
+                padding: const EdgeInsets.fromLTRB(8, 8, 8, 0),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
                   child: LinearProgressIndicator(

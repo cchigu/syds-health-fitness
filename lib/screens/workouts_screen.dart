@@ -5,6 +5,7 @@ import '../services/profile_repository.dart';
 import '../services/workout_planner.dart';
 import '../services/workout_repository.dart';
 import '../utils/dates.dart';
+import '../widgets/time_breakdown.dart';
 import 'workout_detail_screen.dart';
 import 'workout_setup_screen.dart';
 
@@ -275,6 +276,13 @@ class WorkoutsScreen extends StatelessWidget {
                         ].join(' · '),
                   style: TextStyle(color: colors.onPrimaryContainer),
                 ),
+                if (todays != null) ...[
+                  const SizedBox(height: 12),
+                  TimeBreakdown(
+                    breakdown: todays.workout.breakdown,
+                    onColor: colors.onPrimaryContainer,
+                  ),
+                ],
                 const SizedBox(height: 16),
                 if (todays != null)
                   Wrap(
@@ -345,12 +353,15 @@ class WorkoutsScreen extends StatelessWidget {
                 child: Text(_dayNames[s.day.weekday - 1].substring(0, 2)),
               ),
               title: Text(s.workout.title),
+              isThreeLine: true,
               subtitle: Text(
                 s.moved
                     ? '${_fullDayNames[s.day.weekday - 1]} · moved from '
-                        '${_fullDayNames[s.originalDay.weekday - 1]}'
+                        '${_fullDayNames[s.originalDay.weekday - 1]}\n'
+                        '${breakdownSummary(s.workout.breakdown)}'
                     : '${_fullDayNames[s.day.weekday - 1]} · '
-                        '${s.workout.minutes} min',
+                        '${s.workout.minutes} min\n'
+                        '${breakdownSummary(s.workout.breakdown)}',
               ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,

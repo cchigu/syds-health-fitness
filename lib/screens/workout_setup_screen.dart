@@ -19,6 +19,8 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
 
   late Set<int> _days;
   late int _minutes;
+  late Map<int, int> _minutesByDay;
+  static const _lengths = [15, 20, 30, 45, 60];
   WorkoutFocus? _focus;
   Experience? _experience;
   late Set<BodyArea> _avoid;
@@ -32,6 +34,9 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
     final p = WorkoutPrefsRepository.instance.prefs;
     _days = {...?p?.weekdays};
     _minutes = p?.minutes ?? 30;
+    _minutesByDay = {
+      for (var d = 1; d <= 7; d++) d: p?.minutesFor(d) ?? _minutes,
+    };
     _focus = p?.focus;
     _experience = p?.experience;
     _avoid = {...?p?.avoid};
@@ -62,6 +67,7 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
     await WorkoutPrefsRepository.instance.save(WorkoutPrefs(
       weekdays: _days,
       minutes: _minutes,
+      minutesByDay: {for (final d in _days) d: _minutesByDay[d] ?? _minutes},
       focus: _focus!,
       experience: _experience!,
       avoid: _nothingToAvoid ? {} : _avoid,
@@ -223,24 +229,54 @@ class _WorkoutSetupScreenState extends State<WorkoutSetupScreen> {
         ],
       );
 
-  Widget _lengthPage() => _question(
-        'How much time do you have per workout?',
-        'Including warm-up and stretching.',
-        [
-          for (final (m, label, sub) in const [
-            (20, '20 minutes', 'Quick and focused'),
-            (30, '30 minutes', 'The sweet spot'),
-            (45, '45 minutes', 'More exercises and treadmill time'),
-          ])
-            _choice(
-              title: label,
-              subtitle: sub,
-              icon: Icons.timer_outlined,
-              selected: _minutes == m,
-              onTap: () => setState(() => _minutes = m),
-            ),
+  Widget _lengthPage() {
+    final text = Theme.of(context).textTheme;
+    final days = _days.toList()..sort();
+    return _question(
+      'How long do you want to work out each day?',
+      'Including warm-up and stretching. Each workout is planned to fit.',
+      [
+        Text('Same for every day', style: text.titleSmall),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          children: [
+            for (final m in _lengths)
+              ActionChip(
+                label: Text('$m min'),
+                onPressed: () => setState(() {
+                  _minutes = m;
+                  for (final d in days) {
+                    _minutesByDay[d] = m;
+                  }
+                }),
+              ),
+          ],
+        ),
+        const SizedBox(height: 20),
+        for (final d in days) ...[
+          Text(
+            const ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday',
+                'Saturday', 'Sunday'][d - 1],
+            style: text.titleSmall,
+          ),
+          const SizedBox(height: 6),
+          SegmentedButton<int>(
+            showSelectedIcon: false,
+            segments: [
+              for (final m in _lengths)
+                ButtonSegment(value: m, label: Text('$m')),
+            ],
+            selected: {_minutesByDay[d] ?? _minutes},
+            onSelectionChanged: (v) =>
+                setState(() => _minutesByDay[d] = v.first),
+          ),
+          const SizedBox(height: 14),
         ],
-      );
+        Text('Minutes per workout', style: text.bodySmall),
+      ],
+    );
+  }
 
   Widget _focusPage() => _question(
         'What\'s your main goal?',

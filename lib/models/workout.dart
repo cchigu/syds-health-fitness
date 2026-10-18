@@ -126,8 +126,14 @@ class WorkoutPrefs implements Syncable {
     this.removed = const {},
     this.extras = const {},
     this.customExercises = const [],
+    this.minutesByDay = const {},
     this.deleted = false,
   });
+
+  /// Workout length for each weekday (falls back to [minutes]).
+  final Map<int, int> minutesByDay;
+
+  int minutesFor(int weekday) => minutesByDay[weekday] ?? minutes;
 
   /// -2 (easiest) to +2 (hardest); 0 = the plan as built.
   final int intensity;
@@ -169,6 +175,7 @@ class WorkoutPrefs implements Syncable {
     Set<String>? removed,
     Map<String, List<ExtraExercise>>? extras,
     List<CustomExerciseDef>? customExercises,
+    Map<int, int>? minutesByDay,
     DateTime? updatedAt,
   }) =>
       WorkoutPrefs(
@@ -183,6 +190,7 @@ class WorkoutPrefs implements Syncable {
         removed: removed ?? this.removed,
         extras: extras ?? this.extras,
         customExercises: customExercises ?? this.customExercises,
+        minutesByDay: minutesByDay ?? this.minutesByDay,
         updatedAt: updatedAt ?? this.updatedAt,
       );
 
@@ -204,6 +212,9 @@ class WorkoutPrefs implements Syncable {
             e.key: [for (final x in e.value) x.toMap()],
         },
         'customExercises': [for (final c in customExercises) c.toMap()],
+        'minutesByDay': {
+          for (final e in minutesByDay.entries) '${e.key}': e.value,
+        },
         'updatedAt': updatedAt.millisecondsSinceEpoch,
         'deleted': deleted,
       };
@@ -255,6 +266,11 @@ class WorkoutPrefs implements Syncable {
         for (final c in (m['customExercises'] as List?) ?? const [])
           if (c is Map) CustomExerciseDef.fromMap(Map<String, dynamic>.from(c)),
       ],
+      minutesByDay: {
+        for (final e in ((m['minutesByDay'] as Map?) ?? const {}).entries)
+          if (int.tryParse('${e.key}') case final d? when e.value is num)
+            d: (e.value as num).toInt(),
+      },
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
           (m['updatedAt'] as num?)?.toInt() ?? 0),
       deleted: m['deleted'] == true,
@@ -317,9 +333,25 @@ class PlannedExercise {
     this.alternatives = const [],
     this.custom = false,
     this.extraIndex,
+    this.minutes = 0,
   });
 
   final Exercise exercise;
+
+  /// Estimated time this takes, sets and rest included.
+  final double minutes;
+
+  PlannedExercise withMinutes(double m) => PlannedExercise(
+        exercise: exercise,
+        prescription: prescription,
+        weight: weight,
+        rest: rest,
+        slotKey: slotKey,
+        alternatives: alternatives,
+        custom: custom,
+        extraIndex: extraIndex,
+        minutes: m,
+      );
 
   /// True when she set her own numbers for it.
   final bool custom;
@@ -363,6 +395,50 @@ class PlannedWorkout {
   final String subtitle;
   final int minutes;
   final List<WorkoutSection> sections;
+
+  /// How the time splits between warm-up, strength, treadmill and stretching.
+  WorkoutBreakdown get breakdown {
+    var warm = 0.0, strength = 0.0, cardio = 0.0, stretch = 0.0;
+    for (final s in sections) {
+      for (final pe in s.exercises) {
+        switch (pe.exercise.kind) {
+          case ExerciseKind.warmup:
+            warm += pe.minutes;
+          case ExerciseKind.strength:
+          case ExerciseKind.core:
+            strength += pe.minutes;
+          case ExerciseKind.cardio:
+            cardio += pe.minutes;
+          case ExerciseKind.stretch:
+            stretch += pe.minutes;
+        }
+      }
+    }
+    return WorkoutBreakdown(
+      warmup: warm.round(),
+      strength: strength.round(),
+      treadmill: cardio.round(),
+      stretching: stretch.round(),
+    );
+  }
+}
+
+class WorkoutBreakdown {
+  const WorkoutBreakdown({
+    required this.warmup,
+    required this.strength,
+    required this.treadmill,
+    required this.stretching,
+  });
+
+  final int warmup;
+
+  /// Dumbbell and core work.
+  final int strength;
+  final int treadmill;
+  final int stretching;
+
+  int get total => warmup + strength + treadmill + stretching;
 }
 
 /// Her own numbers for an exercise.
