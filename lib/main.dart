@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
 import 'services/profile_repository.dart';
+import 'screens/love_splash_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/workouts_screen.dart';
@@ -39,7 +40,7 @@ class SydsHealthApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const HomeShell(),
+      home: const LoveSplashScreen(next: HomeShell()),
     );
   }
 }
