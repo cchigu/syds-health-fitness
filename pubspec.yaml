@@ -41,6 +41,7 @@ dependencies:
   http: ^1.6.0
   mobile_scanner: ^7.4.2
   fl_chart: ^1.2.0
+  confetti: ^0.8.0
 
 dev_dependencies:
   flutter_test:
