@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
+import 'services/food_log_repository.dart';
 import 'services/profile_repository.dart';
 import 'screens/love_splash_screen.dart';
 import 'screens/today_screen.dart';
@@ -15,6 +16,7 @@ Future<void> main() async {
     options: DefaultFirebaseOptions.currentPlatform,
   );
   await ProfileRepository.instance.init();
+  await FoodLogRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 

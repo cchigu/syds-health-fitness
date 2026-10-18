@@ -1,0 +1,266 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+import '../config/api_keys.dart';
+import '../models/food.dart';
+import '../models/nutrients.dart';
+import '../utils/units.dart';
+
+class FoodSearchResult {
+  const FoodSearchResult(this.foods, {this.usdaError, this.offError});
+
+  final List<FoodItem> foods;
+  final Object? usdaError;
+  final Object? offError;
+
+  bool get bothFailed => usdaError != null && offError != null;
+}
+
+/// Searches USDA FoodData Central and Open Food Facts at the same time.
+///
+/// Order of results (US first, as requested):
+///   1. USDA (US generic foods, US restaurants and US brands)
+///   2. Open Food Facts products sold in the US
+///   3. Open Food Facts products from everywhere else
+class FoodSearchService {
+  FoodSearchService._();
+
+  static final http.Client _client = http.Client();
+  static const Duration _timeout = Duration(seconds: 12);
+  static const String _userAgent =
+      'SydsHealthFitness/1.0 (github.com/cchigu/syds-health-fitness)';
+
+  static Future<FoodSearchResult> search(String query) async {
+    final q = query.trim();
+    if (q.length < 2) return const FoodSearchResult([]);
+
+    Object? usdaError;
+    Object? offError;
+    final results = await Future.wait([
+      _searchUsda(q).catchError((Object e) {
+        usdaError = e;
+        debugPrint('USDA search failed: $e');
+        return <FoodItem>[];
+      }),
+      _searchOff(q).catchError((Object e) {
+        offError = e;
+        debugPrint('Open Food Facts search failed: $e');
+        return <FoodItem>[];
+      }),
+    ]);
+
+    final off = results[1];
+    final ordered = [
+      ...results[0],
+      ...off.where((f) => f.fromUs),
+      ...off.where((f) => !f.fromUs),
+    ];
+
+    // Drop near-duplicates (same name and brand).
+    final seen = <String>{};
+    final unique = [
+      for (final f in ordered)
+        if (seen.add('${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}'))
+          f,
+    ];
+
+    return FoodSearchResult(unique, usdaError: usdaError, offError: offError);
+  }
+
+  // ------------------------------------------------------------------ USDA
+
+  static Future<List<FoodItem>> _searchUsda(String q) async {
+    final uri = Uri.https('api.nal.usda.gov', '/fdc/v1/foods/search', {
+      'api_key': ApiKeys.usda,
+      'query': q,
+      'pageSize': '25',
+      'dataType': 'Foundation,SR Legacy,Survey (FNDDS),Branded',
+    });
+    final res = await _client.get(uri).timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('USDA returned ${res.statusCode}');
+    }
+    return parseUsda(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// Turns a USDA search response into foods. Values are per 100 g.
+  @visibleForTesting
+  static List<FoodItem> parseUsda(Map<String, dynamic> json) {
+    final foods = <FoodItem>[];
+    for (final raw in (json['foods'] as List?) ?? const []) {
+      if (raw is! Map) continue;
+      final f = Map<String, dynamic>.from(raw);
+
+      final byId = <int, double>{};
+      double? kcalFromKj;
+      for (final n in (f['foodNutrients'] as List?) ?? const []) {
+        if (n is! Map) continue;
+        final id = (n['nutrientId'] as num?)?.toInt();
+        final value = (n['value'] as num?)?.toDouble();
+        final unit = (n['unitName'] as String?)?.toUpperCase() ?? '';
+        if (id == null || value == null) continue;
+        if (id == 1008 && unit == 'KJ') {
+          kcalFromKj = value / 4.184;
+        } else if (id == 1062) {
+          kcalFromKj ??= value / 4.184;
+        } else {
+          byId[id] = value;
+        }
+      }
+
+      // Energy: label calories, else Atwater calories, else from kJ.
+      final kcal = byId[1008] ?? byId[2047] ?? byId[2048] ?? kcalFromKj;
+      if (kcal == null) continue;
+
+      final servings = <Serving>[];
+      final size = (f['servingSize'] as num?)?.toDouble();
+      final unit = (f['servingSizeUnit'] as String?)?.toLowerCase() ?? '';
+      if (size != null && size > 0 &&
+          const ['g', 'grm', 'ml', 'mlt'].contains(unit)) {
+        final unitLabel = unit.startsWith('m') ? 'ml' : 'g';
+        final household = (f['householdServingFullText'] as String?)?.trim();
+        servings.add(Serving(
+          (household != null && household.isNotEmpty)
+              ? '${_tidy(household)} (${trimNumber(size)} $unitLabel)'
+              : '1 serving (${trimNumber(size)} $unitLabel)',
+          size,
+        ));
+      }
+      for (final m in ((f['foodMeasures'] as List?) ?? const []).take(5)) {
+        if (m is! Map) continue;
+        final text = (m['disseminationText'] as String?)?.trim() ?? '';
+        final grams = (m['gramWeight'] as num?)?.toDouble();
+        if (text.isEmpty ||
+            text.toLowerCase() == 'quantity not specified' ||
+            grams == null ||
+            grams <= 0) {
+          continue;
+        }
+        servings.add(Serving('$text (${trimNumber(grams)} g)', grams));
+      }
+
+      final brand = (f['brandName'] as String?) ?? (f['brandOwner'] as String?);
+      foods.add(FoodItem(
+        id: 'usda:${f['fdcId']}',
+        name: _tidy((f['description'] as String?) ?? 'Food'),
+        brand: brand == null || brand.trim().isEmpty ? null : _tidy(brand),
+        source: FoodSource.usda,
+        fromUs: true,
+        servings: servings,
+        per100g: Nutrients(
+          calories: kcal,
+          protein: byId[1003] ?? 0,
+          fat: byId[1004] ?? 0,
+          carbs: byId[1005] ?? 0,
+          fiber: byId[1079] ?? 0,
+        ),
+      ));
+    }
+    return foods;
+  }
+
+  // -------------------------------------------------------- Open Food Facts
+
+  static Future<List<FoodItem>> _searchOff(String q) async {
+    final uri = Uri.https('world.openfoodfacts.org', '/cgi/search.pl', {
+      'search_terms': q,
+      'search_simple': '1',
+      'action': 'process',
+      'json': '1',
+      'page_size': '24',
+      'fields': 'code,product_name,brands,nutriments,serving_size,'
+          'serving_quantity,countries_tags',
+    });
+    final res = await _client
+        .get(uri, headers: {'User-Agent': _userAgent})
+        .timeout(_timeout);
+    if (res.statusCode != 200) {
+      throw Exception('Open Food Facts returned ${res.statusCode}');
+    }
+    return parseOff(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  /// Turns an Open Food Facts search response into foods.
+  @visibleForTesting
+  static List<FoodItem> parseOff(Map<String, dynamic> json) {
+    final foods = <FoodItem>[];
+    for (final raw in (json['products'] as List?) ?? const []) {
+      if (raw is! Map) continue;
+      final p = Map<String, dynamic>.from(raw);
+      final product = parseOffProduct(p);
+      if (product != null) foods.add(product);
+    }
+    return foods;
+  }
+
+  /// One Open Food Facts product (also used by barcode scanning later).
+  static FoodItem? parseOffProduct(Map<String, dynamic> p) {
+    final name = (p['product_name'] as String?)?.trim() ?? '';
+    final code = (p['code'] ?? '').toString();
+    if (name.isEmpty || code.isEmpty) return null;
+
+    final n = p['nutriments'] is Map
+        ? Map<String, dynamic>.from(p['nutriments'] as Map)
+        : <String, dynamic>{};
+    final kj = _num(n['energy_100g']);
+    final kcal = _num(n['energy-kcal_100g']) ?? (kj == null ? null : kj / 4.184);
+    if (kcal == null) return null;
+
+    final servings = <Serving>[];
+    final qty = _num(p['serving_quantity']);
+    final sizeText = (p['serving_size'] as String?)?.trim() ?? '';
+    if (qty != null && qty > 0) {
+      final label = sizeText.isEmpty
+          ? '1 serving (${trimNumber(qty)} g)'
+          : (RegExp(r'\d').hasMatch(sizeText)
+              ? sizeText
+              : '$sizeText (${trimNumber(qty)} g)');
+      servings.add(Serving(label, qty));
+    }
+
+    final brands = (p['brands'] as String?)?.split(',').first.trim();
+    final countries = (p['countries_tags'] as List?) ?? const [];
+
+    return FoodItem(
+      id: 'off:$code',
+      name: name,
+      brand: brands == null || brands.isEmpty ? null : brands,
+      source: FoodSource.openFoodFacts,
+      fromUs: countries.contains('en:united-states'),
+      servings: servings,
+      per100g: Nutrients(
+        calories: kcal,
+        protein: _num(n['proteins_100g']) ?? 0,
+        carbs: _num(n['carbohydrates_100g']) ?? 0,
+        fat: _num(n['fat_100g']) ?? 0,
+        fiber: _num(n['fiber_100g']) ?? 0,
+      ),
+    );
+  }
+
+  /// Open Food Facts sometimes sends numbers as text.
+  static double? _num(Object? v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v.replaceAll(',', '.'));
+    return null;
+  }
+
+  /// "McDONALD'S, BIG MAC" -> "McDonald's, Big Mac". Leaves mixed case alone.
+  static String _tidy(String s) {
+    final t = s.trim();
+    final letters = t.replaceAll(RegExp(r'[^A-Za-z]'), '');
+    final mostlyUpper = letters.isNotEmpty &&
+        letters.replaceAll(RegExp(r'[^A-Z]'), '').length / letters.length > 0.7;
+    if (!mostlyUpper) return t;
+    return t.toLowerCase().replaceAllMapped(
+          RegExp(r"(^|[\s,(/-])([a-z])"),
+          (m) => '${m[1]}${m[2]!.toUpperCase()}',
+        ).replaceAllMapped(
+          RegExp(r"\bMc([a-z])"),
+          (m) => 'Mc${m[1]!.toUpperCase()}',
+        );
+  }
+}

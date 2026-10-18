@@ -1,3 +1,5 @@
+export '../utils/dates.dart' show dayOnly;
+
 /// The real-life data used to work out Syd's actual maintenance calories.
 ///
 /// Empty for now: the food log (Milestone 4) fills in [caloriesByDay] and the
@@ -21,5 +23,3 @@ class WeightEntry {
   final DateTime date;
   final double kg;
 }
-
-DateTime dayOnly(DateTime d) => DateTime(d.year, d.month, d.day);
