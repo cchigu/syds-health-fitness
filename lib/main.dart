@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
+import 'services/profile_repository.dart';
 import 'screens/today_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/workouts_screen.dart';
@@ -12,6 +13,7 @@ Future<void> main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await ProfileRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 
