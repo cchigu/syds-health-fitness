@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models/user_profile.dart';
 import '../services/profile_repository.dart';
+import '../services/weight_repository.dart';
 import '../utils/units.dart';
 
 /// Form for name, body stats, activity level, goal and units.
@@ -135,6 +136,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
 
     final repo = ProfileRepository.instance;
+    final oldWeight = repo.profile.weightKg;
+    if (oldWeight == null || (oldWeight - weightKg!).abs() > 0.01) {
+      // Typing a new weight here counts as today's weigh-in.
+      await WeightRepository.instance.log(DateTime.now(), weightKg!);
+    }
     await repo.update(repo.profile.copyWith(
       name: name,
       sex: _sex,

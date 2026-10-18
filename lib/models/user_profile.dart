@@ -72,6 +72,7 @@ class UserProfile {
     this.rateKgPerWeek = 0.45,
     this.caloriesOverride,
     this.macroSplit,
+    this.goalWeightKg,
   });
 
   final String name;
@@ -92,6 +93,9 @@ class UserProfile {
 
   /// Her own macro split. Null = use the recommended split.
   final MacroSplit? macroSplit;
+
+  /// Optional target weight shown on the Progress chart.
+  final double? goalWeightKg;
 
   /// When this profile was last edited; used to decide whether the phone's
   /// copy or the cloud copy is newer.
@@ -142,6 +146,7 @@ class UserProfile {
     double? rateKgPerWeek,
     Object? caloriesOverride = _keep,
     Object? macroSplit = _keep,
+    Object? goalWeightKg = _keep,
     DateTime? updatedAt,
   }) =>
       UserProfile(
@@ -160,6 +165,9 @@ class UserProfile {
         macroSplit: identical(macroSplit, _keep)
             ? this.macroSplit
             : macroSplit as MacroSplit?,
+        goalWeightKg: identical(goalWeightKg, _keep)
+            ? this.goalWeightKg
+            : goalWeightKg as double?,
         updatedAt: updatedAt ?? this.updatedAt,
       );
 
@@ -175,6 +183,7 @@ class UserProfile {
         'rateKgPerWeek': rateKgPerWeek,
         'caloriesOverride': caloriesOverride,
         'macroSplit': macroSplit?.toMap(),
+        'goalWeightKg': goalWeightKg,
         'updatedAt': updatedAt.millisecondsSinceEpoch,
       };
 
@@ -199,6 +208,7 @@ class UserProfile {
       rateKgPerWeek: toDouble(map['rateKgPerWeek']) ?? 0.45,
       caloriesOverride: toDouble(map['caloriesOverride']),
       macroSplit: MacroSplit.fromMap(map['macroSplit']),
+      goalWeightKg: toDouble(map['goalWeightKg']),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
         (map['updatedAt'] as num?)?.toInt() ?? 0,
       ),
