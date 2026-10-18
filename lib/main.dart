@@ -7,6 +7,7 @@ import 'services/exercise_log_repository.dart';
 import 'services/food_log_repository.dart';
 import 'services/profile_repository.dart';
 import 'services/saved_meals.dart';
+import 'services/treadmill_repository.dart';
 import 'services/weight_repository.dart';
 import 'services/workout_repository.dart';
 import 'screens/love_splash_screen.dart';
@@ -30,6 +31,7 @@ Future<void> main() async {
   await WorkoutLogRepository.instance.init();
   await WorkoutScheduleRepository.instance.init();
   await ExerciseLogRepository.instance.init();
+  await TreadmillRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 

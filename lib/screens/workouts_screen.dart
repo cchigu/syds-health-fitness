@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../models/workout.dart';
 import '../services/profile_repository.dart';
+import '../services/treadmill_repository.dart';
 import '../services/workout_planner.dart';
 import '../services/workout_repository.dart';
 import '../utils/dates.dart';
 import '../widgets/minutes_stepper.dart';
 import '../widgets/time_breakdown.dart';
 import 'records_screen.dart';
+import 'treadmill_log_sheet.dart';
 import 'workout_detail_screen.dart';
 import 'workout_setup_screen.dart';
 
@@ -195,9 +197,10 @@ class WorkoutsScreen extends StatelessWidget {
     final log = WorkoutLogRepository.instance;
     final profile = ProfileRepository.instance;
     final moves = WorkoutScheduleRepository.instance;
+    final treadmill = TreadmillRepository.instance;
 
     return ListenableBuilder(
-      listenable: Listenable.merge([prefsRepo, log, profile, moves]),
+      listenable: Listenable.merge([prefsRepo, log, profile, moves, treadmill]),
       builder: (context, _) {
         final prefs = prefsRepo.prefs;
         return Scaffold(
@@ -254,6 +257,12 @@ class WorkoutsScreen extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text('Build my plan'),
               ),
+            ),
+            const SizedBox(height: 8),
+            TextButton.icon(
+              onPressed: () => showTreadmillLog(context),
+              icon: const Icon(Icons.directions_walk),
+              label: const Text('Log a treadmill session'),
             ),
           ],
         ),
@@ -369,16 +378,27 @@ class WorkoutsScreen extends StatelessWidget {
                     ],
                   )
                 else
-                  OutlinedButton.icon(
-                    onPressed: () => _open(
-                      context,
-                      WorkoutPlanner.restDay(
-                          prefs, ProfileRepository.instance.profile.units),
-                      today,
-                      isRestDay: true,
-                    ),
-                    icon: const Icon(Icons.self_improvement),
-                    label: const Text('10-minute stretch'),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _open(
+                          context,
+                          WorkoutPlanner.restDay(
+                              prefs, ProfileRepository.instance.profile.units),
+                          today,
+                          isRestDay: true,
+                        ),
+                        icon: const Icon(Icons.self_improvement),
+                        label: const Text('10-minute stretch'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: () => showTreadmillLog(context),
+                        icon: const Icon(Icons.directions_walk),
+                        label: const Text('Log treadmill'),
+                      ),
+                    ],
                   ),
               ],
             ),
@@ -386,6 +406,7 @@ class WorkoutsScreen extends StatelessWidget {
         ),
 
         _IntensityCard(level: prefs.intensity),
+        const _TreadmillCard(),
 
         // Week plan
         Padding(
@@ -606,3 +627,100 @@ class _IntensityCard extends StatelessWidget {
     );
   }
 }
+
+/// Treadmill sessions logged today, this week's totals, and a log button.
+class _TreadmillCard extends StatelessWidget {
+  const _TreadmillCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final colors = Theme.of(context).colorScheme;
+    final repo = TreadmillRepository.instance;
+    final units = ProfileRepository.instance.profile.units;
+    final weightKg = ProfileRepository.instance.profile.weightKg ?? 65;
+    final today = dayOnly(DateTime.now());
+    final todays = repo.onDay(today);
+    final week = repo.inWeekOf(today);
+    final weekMin = week.fold<double>(0, (t, s) => t + s.minutes);
+    final weekMiles = week.fold<double>(0, (t, s) => t + s.miles);
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.directions_walk, color: colors.primary),
+                const SizedBox(width: 8),
+                Expanded(child: Text('Treadmill', style: text.titleMedium)),
+                TextButton.icon(
+                  onPressed: () => showTreadmillLog(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Log session'),
+                ),
+              ],
+            ),
+            if (week.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6, right: 8),
+                child: Text(
+                  'Hopped on the treadmill outside a workout? Log the time, '
+                  'speed and incline here.',
+                  style: text.bodySmall,
+                ),
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(
+                  'This week: ${week.length} '
+                  '${week.length == 1 ? 'session' : 'sessions'} · '
+                  '${weekMin.round()} min · ${distanceText(weekMiles, units)}',
+                  style: text.bodySmall,
+                ),
+              ),
+            for (final s in todays)
+              Dismissible(
+                key: ValueKey(s.id),
+                direction: DismissDirection.endToStart,
+                background: Container(
+                  color: colors.errorContainer,
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 20),
+                  child: Icon(Icons.delete_outline,
+                      color: colors.onErrorContainer),
+                ),
+                onDismissed: (_) {
+                  repo.delete(s);
+                  ScaffoldMessenger.of(context)
+                    ..hideCurrentSnackBar()
+                    ..showSnackBar(SnackBar(
+                      content: const Text('Treadmill session removed'),
+                      action: SnackBarAction(
+                        label: 'Undo',
+                        onPressed: () => repo.restore(s),
+                      ),
+                    ));
+                },
+                child: ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  onTap: () => showTreadmillLog(context, existing: s),
+                  title: Text('Today · ${treadmillSummary(s, units)}'),
+                  subtitle: Text(
+                    '${distanceText(s.miles, units)} · '
+                    '≈ ${s.caloriesFor(weightKg).round()} cal'
+                    '${s.note.isEmpty ? '' : ' · ${s.note}'}',
+                  ),
+                  trailing: const Icon(Icons.edit_outlined, size: 18),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
