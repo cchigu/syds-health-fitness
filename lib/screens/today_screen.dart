@@ -17,14 +17,17 @@ import 'recipe_editor_screen.dart';
 /// Today tab: calories and macros vs. goals, and the four meals.
 /// The arrows switch days so past days can be checked or filled in.
 class TodayScreen extends StatefulWidget {
-  const TodayScreen({super.key});
+  const TodayScreen({super.key, this.initialDay});
+
+  /// Open on a specific day (e.g. from the Calendar).
+  final DateTime? initialDay;
 
   @override
   State<TodayScreen> createState() => _TodayScreenState();
 }
 
 class _TodayScreenState extends State<TodayScreen> {
-  DateTime _day = dayOnly(DateTime.now());
+  late DateTime _day = dayOnly(widget.initialDay ?? DateTime.now());
 
   bool get _isToday => isSameDay(_day, DateTime.now());
 

@@ -119,6 +119,8 @@ class WorkoutLogRepository extends SyncedStore<WorkoutDone> {
 
   bool doneOn(DateTime day) => byId(dayKey(day)) != null;
 
+  WorkoutDone? on(DateTime day) => byId(dayKey(day));
+
   Future<void> markDone(DateTime day, String title, int minutes) =>
       put(WorkoutDone(
         day: dayOnly(day),

@@ -11,6 +11,7 @@ import 'services/treadmill_repository.dart';
 import 'services/weight_repository.dart';
 import 'services/workout_repository.dart';
 import 'screens/love_splash_screen.dart';
+import 'screens/calendar_screen.dart';
 import 'screens/today_screen.dart';
 import 'screens/progress_screen.dart';
 import 'screens/workouts_screen.dart';
@@ -76,6 +77,7 @@ class _HomeShellState extends State<HomeShell> {
   // IndexedStack keeps each tab's state when switching between tabs.
   final List<Widget> _pages = const [
     TodayScreen(),
+    CalendarScreen(),
     ProgressScreen(),
     WorkoutsScreen(),
     ProfileScreen(),
@@ -93,6 +95,11 @@ class _HomeShellState extends State<HomeShell> {
             icon: Icon(Icons.restaurant_outlined),
             selectedIcon: Icon(Icons.restaurant),
             label: 'Today',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calendar_month_outlined),
+            selectedIcon: Icon(Icons.calendar_month),
+            label: 'Calendar',
           ),
           NavigationDestination(
             icon: Icon(Icons.show_chart_outlined),

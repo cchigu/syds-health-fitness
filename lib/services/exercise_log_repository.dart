@@ -71,6 +71,11 @@ class ExerciseLogRepository extends SyncedStore<ExerciseSession> {
     return top;
   }
 
+  /// Everything she logged on one day.
+  List<ExerciseSession> allOnDay(DateTime day) => items
+      .where((s) => isSameDay(s.day, day) && s.sets.isNotEmpty)
+      .toList();
+
   /// Every exercise she has logged at least once.
   Set<String> get loggedExercises => {
         for (final s in items)
