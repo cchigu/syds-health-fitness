@@ -163,8 +163,8 @@ class ProfileScreen extends StatelessWidget {
                   subtitle: Text(
                     repo.goals == null
                         ? 'Finish your profile to get goals'
-                        : '${repo.goals!.calories.round()} calories · '
-                            '${repo.usingCustomGoals ? 'custom' : 'recommended'}',
+                        : '${formatKcal(repo.goals!.calories)} cal / day · '
+                            '${p.goal.label}',
                   ),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => Navigator.of(context).push(

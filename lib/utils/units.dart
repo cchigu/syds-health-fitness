@@ -35,3 +35,27 @@ String formatHeight(double? cm, Units units) {
   final (ft, inch) = cmToFtIn(cm);
   return '$ft\' $inch"';
 }
+
+/// 1380 -> "1,380".
+String formatKcal(double value) {
+  final s = value.round().abs().toString();
+  final buf = StringBuffer(value < 0 ? '-' : '');
+  for (var i = 0; i < s.length; i++) {
+    if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+    buf.write(s[i]);
+  }
+  return buf.toString();
+}
+
+/// A pace like "1 lb / week" or "0.5 kg / week" (always positive).
+String formatRate(double kgPerWeek, Units units) => units == Units.imperial
+    ? '${trimNumber(kgToLb(kgPerWeek), decimals: 2)} lb / week'
+    : '${trimNumber(kgPerWeek, decimals: 2)} kg / week';
+
+/// A signed weight change like "-0.4 lb / week".
+String formatTrend(double kgPerWeek, Units units) {
+  final v = units == Units.imperial ? kgToLb(kgPerWeek) : kgPerWeek;
+  final sign = v > 0 ? '+' : (v < 0 ? '-' : '');
+  final unit = units == Units.imperial ? 'lb' : 'kg';
+  return '$sign${trimNumber(v.abs(), decimals: 2)} $unit / week';
+}

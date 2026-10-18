@@ -22,7 +22,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late Sex _sex;
   DateTime? _birthDate;
   late ActivityLevel _activity;
-  late Goal _goal;
   late Units _units;
 
   // The exact saved values, kept until the field is retyped. Switching units
@@ -39,7 +38,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _sex = p.sex;
     _birthDate = p.birthDate;
     _activity = p.activityLevel;
-    _goal = p.goal;
     _units = p.units;
     _exactHeightCm = p.heightCm;
     _exactWeightKg = p.weightKg;
@@ -136,17 +134,15 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       return;
     }
 
-    await ProfileRepository.instance.update(UserProfile(
+    final repo = ProfileRepository.instance;
+    await repo.update(repo.profile.copyWith(
       name: name,
       sex: _sex,
       birthDate: _birthDate,
       heightCm: heightCm,
       weightKg: weightKg,
       activityLevel: _activity,
-      goal: _goal,
       units: _units,
-      updatedAt: DateTime.now(),
-      customGoals: ProfileRepository.instance.profile.customGoals,
     ));
     if (mounted) Navigator.of(context).pop();
   }
@@ -275,17 +271,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                 ],
               ),
-            ),
-
-            _section('Goal'),
-            SegmentedButton<Goal>(
-              showSelectedIcon: false,
-              segments: [
-                for (final g in Goal.values)
-                  ButtonSegment(value: g, label: Text(g.label)),
-              ],
-              selected: {_goal},
-              onSelectionChanged: (s) => setState(() => _goal = s.first),
             ),
 
             const SizedBox(height: 32),

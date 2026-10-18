@@ -6,8 +6,10 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../models/macro_split.dart';
 import '../models/nutrients.dart';
 import '../models/user_profile.dart';
+import 'energy_history.dart';
 import 'goal_calculator.dart';
 
 /// Keeps the profile on the phone and, when signed in, in the cloud.
@@ -25,17 +27,37 @@ class ProfileRepository extends ChangeNotifier {
   UserProfile _profile = UserProfile.empty();
   UserProfile get profile => _profile;
 
-  /// The recommended goals for the current profile (null until complete).
-  GoalBreakdown? get recommendation => GoalCalculator.recommend(_profile);
+  /// Food and weight logs used to learn real maintenance calories.
+  /// Filled in by the food log (Milestone 4) and weight log (Milestone 7).
+  EnergyHistory _history = EnergyHistory.empty;
+  EnergyHistory get history => _history;
+  set history(EnergyHistory value) {
+    _history = value;
+    notifyListeners();
+  }
 
-  /// The goals actually in use: custom ones if set, otherwise recommended.
-  Nutrients? get goals => _profile.customGoals ?? recommendation?.goals;
+  /// Maintenance, pace options, calories and macros (null until the
+  /// profile is complete).
+  GoalPlan? get plan => GoalCalculator.plan(_profile, _history);
 
-  bool get usingCustomGoals => _profile.customGoals != null;
+  /// The daily targets in use right now.
+  Nutrients? get goals => plan?.goals;
 
-  /// Save custom goals, or pass null to switch back to recommended.
-  Future<void> setCustomGoals(Nutrients? goals) =>
-      update(_profile.withCustomGoals(goals));
+  /// Choosing a goal goes back to the recommended calories for it.
+  Future<void> setGoal(Goal goal) =>
+      update(_profile.copyWith(goal: goal, caloriesOverride: null));
+
+  /// Choosing a pace goes back to the recommended calories for it.
+  Future<void> setRate(double kgPerWeek) => update(
+      _profile.copyWith(rateKgPerWeek: kgPerWeek, caloriesOverride: null));
+
+  /// Pass null to use the recommended calories again.
+  Future<void> setCaloriesOverride(double? calories) =>
+      update(_profile.copyWith(caloriesOverride: calories));
+
+  /// Pass null to use the recommended macro split again.
+  Future<void> setMacroSplit(MacroSplit? split) =>
+      update(_profile.copyWith(macroSplit: split));
 
   User? _user;
   User? get user => _user;

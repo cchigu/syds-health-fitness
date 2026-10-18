@@ -4,7 +4,7 @@
 /// the [units] setting only changes how they are shown and typed in.
 library;
 
-import 'nutrients.dart';
+import 'macro_split.dart';
 
 enum Sex { female, male }
 
@@ -42,11 +42,21 @@ extension GoalLabel on Goal {
         Goal.maintain => 'Maintain',
         Goal.gain => 'Gain weight',
       };
+
+  String get shortLabel => switch (this) {
+        Goal.lose => 'Lose',
+        Goal.maintain => 'Maintain',
+        Goal.gain => 'Gain',
+      };
 }
 
 extension UnitsLabel on Units {
   String get label => this == Units.imperial ? 'lbs / ft' : 'kg / cm';
 }
+
+/// Marker meaning "leave this field as it is" in [UserProfile.copyWith],
+/// so nullable fields can still be cleared by passing null.
+const Object _keep = Object();
 
 class UserProfile {
   const UserProfile({
@@ -59,7 +69,9 @@ class UserProfile {
     required this.goal,
     required this.units,
     required this.updatedAt,
-    this.customGoals,
+    this.rateKgPerWeek = 0.45,
+    this.caloriesOverride,
+    this.macroSplit,
   });
 
   final String name;
@@ -71,13 +83,19 @@ class UserProfile {
   final Goal goal;
   final Units units;
 
+  /// How fast to lose or gain, in kg per week (always positive).
+  final double rateKgPerWeek;
+
+  /// Calories Syd typed in herself. Null = use the calories recommended for
+  /// her goal and pace, which update automatically.
+  final double? caloriesOverride;
+
+  /// Her own macro split. Null = use the recommended split.
+  final MacroSplit? macroSplit;
+
   /// When this profile was last edited; used to decide whether the phone's
   /// copy or the cloud copy is newer.
   final DateTime updatedAt;
-
-  /// Goals Syd typed in herself. Null means "use the recommended goals",
-  /// which update automatically whenever the profile changes.
-  final Nutrients? customGoals;
 
   static UserProfile empty() => UserProfile(
         name: '',
@@ -91,7 +109,7 @@ class UserProfile {
         updatedAt: DateTime.fromMillisecondsSinceEpoch(0),
       );
 
-  /// True once every field the macro calculator needs has been filled in.
+  /// True once every field the goal calculator needs has been filled in.
   bool get isComplete =>
       name.trim().isNotEmpty &&
       birthDate != null &&
@@ -112,25 +130,37 @@ class UserProfile {
     return years;
   }
 
-  UserProfile copyWith({DateTime? updatedAt}) => withCustomGoals(
-        customGoals,
-        updatedAt: updatedAt,
-      );
-
-  /// Same profile with different custom goals (pass null to go back to
-  /// the recommended goals).
-  UserProfile withCustomGoals(Nutrients? goals, {DateTime? updatedAt}) =>
+  UserProfile copyWith({
+    String? name,
+    Sex? sex,
+    DateTime? birthDate,
+    double? heightCm,
+    double? weightKg,
+    ActivityLevel? activityLevel,
+    Goal? goal,
+    Units? units,
+    double? rateKgPerWeek,
+    Object? caloriesOverride = _keep,
+    Object? macroSplit = _keep,
+    DateTime? updatedAt,
+  }) =>
       UserProfile(
-        name: name,
-        sex: sex,
-        birthDate: birthDate,
-        heightCm: heightCm,
-        weightKg: weightKg,
-        activityLevel: activityLevel,
-        goal: goal,
-        units: units,
+        name: name ?? this.name,
+        sex: sex ?? this.sex,
+        birthDate: birthDate ?? this.birthDate,
+        heightCm: heightCm ?? this.heightCm,
+        weightKg: weightKg ?? this.weightKg,
+        activityLevel: activityLevel ?? this.activityLevel,
+        goal: goal ?? this.goal,
+        units: units ?? this.units,
+        rateKgPerWeek: rateKgPerWeek ?? this.rateKgPerWeek,
+        caloriesOverride: identical(caloriesOverride, _keep)
+            ? this.caloriesOverride
+            : caloriesOverride as double?,
+        macroSplit: identical(macroSplit, _keep)
+            ? this.macroSplit
+            : macroSplit as MacroSplit?,
         updatedAt: updatedAt ?? this.updatedAt,
-        customGoals: goals,
       );
 
   Map<String, dynamic> toMap() => {
@@ -142,8 +172,10 @@ class UserProfile {
         'activityLevel': activityLevel.name,
         'goal': goal.name,
         'units': units.name,
+        'rateKgPerWeek': rateKgPerWeek,
+        'caloriesOverride': caloriesOverride,
+        'macroSplit': macroSplit?.toMap(),
         'updatedAt': updatedAt.millisecondsSinceEpoch,
-        'customGoals': customGoals?.toMap(),
       };
 
   factory UserProfile.fromMap(Map<String, dynamic> map) {
@@ -164,13 +196,12 @@ class UserProfile {
           pick(ActivityLevel.values, map['activityLevel'], ActivityLevel.light),
       goal: pick(Goal.values, map['goal'], Goal.maintain),
       units: pick(Units.values, map['units'], Units.imperial),
+      rateKgPerWeek: toDouble(map['rateKgPerWeek']) ?? 0.45,
+      caloriesOverride: toDouble(map['caloriesOverride']),
+      macroSplit: MacroSplit.fromMap(map['macroSplit']),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(
         (map['updatedAt'] as num?)?.toInt() ?? 0,
       ),
-      customGoals: map['customGoals'] is Map
-          ? Nutrients.fromMap(
-              Map<String, dynamic>.from(map['customGoals'] as Map))
-          : null,
     );
   }
 }
