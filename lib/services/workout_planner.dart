@@ -346,6 +346,10 @@ class WorkoutPlanner {
     } else if (isCardioDay) {
       strengthCount = m >= 45 ? 4 : 3;
       perExercise = _coreSets(p) * 0.75;
+      // Short days: fewer core moves so there's still real treadmill time.
+      while (strengthCount > 2 && left - strengthCount * perExercise < 5) {
+        strengthCount--;
+      }
       strengthBudget = strengthCount * perExercise;
       cardio = max(5, (left - strengthBudget).round());
     } else {
