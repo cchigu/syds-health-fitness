@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'firebase_options.dart';
+import 'services/custom_food_repository.dart';
 import 'services/food_log_repository.dart';
 import 'services/profile_repository.dart';
 import 'screens/love_splash_screen.dart';
@@ -17,6 +18,7 @@ Future<void> main() async {
   );
   await ProfileRepository.instance.init();
   await FoodLogRepository.instance.init();
+  await CustomFoodRepository.instance.init();
   runApp(const SydsHealthApp());
 }
 

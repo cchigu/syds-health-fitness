@@ -7,6 +7,7 @@ import '../services/profile_repository.dart';
 import '../utils/dates.dart';
 import '../widgets/daily_progress_card.dart';
 import '../widgets/meal_section.dart';
+import 'barcode_scan_screen.dart';
 import 'food_detail_screen.dart';
 import 'food_search_screen.dart';
 import 'goals_screen.dart';
@@ -42,6 +43,14 @@ class _TodayScreenState extends State<TodayScreen> {
     await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => FoodSearchScreen(meal: meal, day: _day),
+      ),
+    );
+  }
+
+  Future<void> _scanFood(Meal meal) async {
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BarcodeScanScreen(meal: meal, day: _day),
       ),
     );
   }
@@ -121,6 +130,7 @@ class _TodayScreenState extends State<TodayScreen> {
                   meal: meal,
                   entries: log.entriesFor(_day, meal),
                   onAdd: () => _addFood(meal),
+                  onScan: () => _scanFood(meal),
                   onOpen: _openEntry,
                 ),
             ],

@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import '../config/api_keys.dart';
 import '../models/food.dart';
 import '../models/meal.dart';
+import '../services/custom_food_repository.dart';
 import '../services/food_log_repository.dart';
 import '../services/food_search_service.dart';
+import 'barcode_scan_screen.dart';
+import 'custom_food_screen.dart';
 import 'food_detail_screen.dart';
 
 /// Search the food databases (or pick a recent food) to add to a meal.
@@ -75,12 +78,38 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
     if (added == true && mounted) Navigator.of(context).pop(true);
   }
 
+  Future<void> _openScreen(Widget screen) async {
+    final added = await Navigator.of(context)
+        .push<bool>(MaterialPageRoute(builder: (_) => screen));
+    if (added == true && mounted) Navigator.of(context).pop(true);
+  }
+
+  void _scan() => _openScreen(
+      BarcodeScanScreen(meal: widget.meal, day: widget.day));
+
+  void _create() => _openScreen(
+      CustomFoodScreen(meal: widget.meal, day: widget.day));
+
   @override
   Widget build(BuildContext context) {
     final searching = _query.text.trim().length >= 2;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Add to ${widget.meal.label}')),
+      appBar: AppBar(
+        title: Text('Add to ${widget.meal.label}'),
+        actions: [
+          IconButton(
+            tooltip: 'Scan barcode',
+            icon: const Icon(Icons.qr_code_scanner),
+            onPressed: _scan,
+          ),
+          IconButton(
+            tooltip: 'Add a food from its label',
+            icon: const Icon(Icons.edit_note),
+            onPressed: _create,
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -122,10 +151,21 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
   Widget _recent() {
     final recent = FoodLogRepository.instance.recent();
     if (recent.isEmpty) {
-      return const _Message(
-        icon: Icons.search,
-        text: 'Search for a food to get started.\n'
-            'Try "banana", "greek yogurt" or "big mac".',
+      return ListView(
+        children: [
+          const _Message(
+            icon: Icons.search,
+            text: 'Search for a food to get started.\n'
+                'Try "banana", "greek yogurt" or "big mac".',
+          ),
+          Center(
+            child: FilledButton.tonalIcon(
+              onPressed: _scan,
+              icon: const Icon(Icons.qr_code_scanner),
+              label: const Text('Scan a barcode'),
+            ),
+          ),
+        ],
       );
     }
     return ListView(
@@ -156,10 +196,16 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
             'Check your internet connection and try again.',
       );
     }
-    if (r.foods.isEmpty && !_loading) {
-      return const _Message(
-        icon: Icons.search_off,
-        text: 'No foods found. Try fewer or different words.',
+    final mine = CustomFoodRepository.instance.search(_query.text);
+    if (r.foods.isEmpty && mine.isEmpty && !_loading) {
+      return ListView(
+        children: [
+          const _Message(
+            icon: Icons.search_off,
+            text: 'No foods found. Try fewer or different words.',
+          ),
+          _CantFind(onCreate: _create),
+        ],
       );
     }
     return ListView(
@@ -175,8 +221,9 @@ class _FoodSearchScreenState extends State<FoodSearchScreen> {
         if (r.offError != null)
           const _Banner('Open Food Facts is unavailable right now. '
               'Showing USDA results only.'),
-        for (final f in r.foods)
+        for (final f in [...mine, ...r.foods])
           _FoodTile(food: f, onTap: () => _open(f)),
+        _CantFind(onCreate: _create),
       ],
     );
   }
@@ -271,4 +318,19 @@ class _Message extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CantFind extends StatelessWidget {
+  const _CantFind({required this.onCreate});
+  final VoidCallback onCreate;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+        child: OutlinedButton.icon(
+          onPressed: onCreate,
+          icon: const Icon(Icons.edit_note),
+          label: const Text("Can't find it? Add it from the label"),
+        ),
+      );
 }

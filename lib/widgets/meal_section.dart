@@ -11,12 +11,14 @@ class MealSection extends StatelessWidget {
     required this.meal,
     required this.entries,
     required this.onAdd,
+    required this.onScan,
     required this.onOpen,
   });
 
   final Meal meal;
   final List<LogEntry> entries;
   final VoidCallback onAdd;
+  final VoidCallback onScan;
   final void Function(LogEntry entry) onOpen;
 
   @override
@@ -81,15 +83,22 @@ class MealSection extends StatelessWidget {
                     style: text.bodyMedium),
               ),
             ),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-              child: TextButton.icon(
-                onPressed: onAdd,
-                icon: const Icon(Icons.add),
-                label: const Text('Add food'),
-              ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
+            child: Row(
+              children: [
+                TextButton.icon(
+                  onPressed: onAdd,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add food'),
+                ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Scan barcode',
+                  onPressed: onScan,
+                  icon: const Icon(Icons.qr_code_scanner),
+                ),
+              ],
             ),
           ),
         ],
