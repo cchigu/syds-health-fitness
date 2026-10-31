@@ -34,10 +34,6 @@ workflows:
           printf '{"USDA_API_KEY": "%s"}\n' "$USDA_API_KEY" > secrets.json
       - name: Get packages
         script: flutter pub get
-      - name: Install pods
-        script: |
-          cd ios
-          pod install --repo-update
       - name: Set up keychain
         script: keychain initialize
       - name: Fetch or create signing certificate and profile
