@@ -1,0 +1,69 @@
+# Builds the iPhone app on Codemagic's Macs and sends it to TestFlight.
+#
+# One-time setup (Codemagic):
+#   - Team integrations > Developer Portal: an App Store Connect API key
+#     named "Codemagic" (must match `app_store_connect` below).
+#   - This app's Environment variables, group "ios_secrets" (all Secure):
+#       CERTIFICATE_PRIVATE_KEY  the RSA key used to create the signing
+#                                certificate (whole file, BEGIN..END lines)
+#       APP_STORE_APPLE_ID       the app's numeric Apple ID (App Store Connect
+#                                > App Information > Apple ID)
+#       USDA_API_KEY             the food database key from secrets.json
+workflows:
+  ios-testflight:
+    name: iPhone → TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Codemagic
+    environment:
+      groups:
+        - ios_secrets
+      vars:
+        BUNDLE_ID: com.cchigu.sydsHealthFitness
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - $HOME/Library/Caches/CocoaPods
+    scripts:
+      - name: Write API keys
+        script: |
+          printf '{"USDA_API_KEY": "%s"}\n' "$USDA_API_KEY" > secrets.json
+      - name: Get packages
+        script: flutter pub get
+      - name: Install pods
+        script: |
+          cd ios
+          pod install --repo-update
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Fetch or create signing certificate and profile
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
+            --create
+      - name: Add certificate to keychain
+        script: keychain add-certificates
+      - name: Use profiles in Xcode project
+        script: xcode-project use-profiles
+      - name: Build the iPhone app
+        script: |
+          LATEST=$(app-store-connect get-latest-testflight-build-number \
+            "$APP_STORE_APPLE_ID" 2>/dev/null || echo 0)
+          BUILD_NUMBER=$(( ${LATEST:-0} + 1 ))
+          echo "Building number $BUILD_NUMBER"
+          flutter build ipa --release \
+            --build-number=$BUILD_NUMBER \
+            --dart-define-from-file=secrets.json \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true

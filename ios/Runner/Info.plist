@@ -4,6 +4,22 @@
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Scan food barcodes to log what you eat.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<!-- Lets Google sign-in return to the app after signing in. -->
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.563111709953-a19kkm9eb8m56a5img07nbgl5g4spiif</string>
+				<string>app-1-563111709953-ios-078fef1db96cc3dcb69f00</string>
+			</array>
+		</dict>
+	</array>
+	<!-- Only standard HTTPS: skips the export-compliance question on every build. -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
